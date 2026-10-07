@@ -2,6 +2,8 @@
 
 Date : 7 octobre 2026.
 
+Ce document décrit la livraison initiale. Le solveur, le freinage, la transmission et certains paramètres ont ensuite évolué dans [l’étape 2 — Calibration](step-2-calibration.md), qui décrit le comportement actuel.
+
 ## 1. Périmètre livré
 
 L’application Vite, React et TypeScript fournit une démonstration de conduite 3D avec Three.js, React Three Fiber et Rapier. Un seul monde physique fait autorité. Aucun backend, fournisseur cartographique ou modèle automobile tiers n’est nécessaire : piste, carrosserie et roues sont procédurales.

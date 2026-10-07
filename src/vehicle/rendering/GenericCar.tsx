@@ -5,21 +5,9 @@ import type { Group } from 'three';
 import type { VehicleInput, VehicleTelemetry } from '../../shared/types';
 import { genericVehicle } from '../configs/genericVehicle';
 import { useVehiclePhysics, type WheelPose } from '../physics/useVehiclePhysics';
+import { resetVehicleBody, vehicleMassProperties, VEHICLE_COLLIDER_FRICTION, VEHICLE_COLLIDER_RESTITUTION, VEHICLE_SPAWN } from '../physics/vehicleBody';
 
-const rigidBodyMassProperties = {
-  mass: genericVehicle.massKg,
-  centerOfMass: {
-    x: genericVehicle.centerOfGravityM.xM,
-    y: genericVehicle.centerOfGravityM.yM,
-    z: genericVehicle.centerOfGravityM.zM,
-  },
-  principalAngularInertia: {
-    x: genericVehicle.principalInertiaKgM2.xM,
-    y: genericVehicle.principalInertiaKgM2.yM,
-    z: genericVehicle.principalInertiaKgM2.zM,
-  },
-  angularInertiaLocalFrame: { x: 0, y: 0, z: 0, w: 1 },
-};
+const rigidBodyMassProperties = vehicleMassProperties(genericVehicle);
 
 interface GenericCarProps {
   bodyRef: React.RefObject<RapierRigidBody | null>;
@@ -78,12 +66,7 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
   const respawn = useCallback(() => {
     const rigidBody = bodyRef.current;
     if (!rigidBody) return;
-    rigidBody.setTranslation({ x: 38, y: 0.9, z: 0 }, true);
-    rigidBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
-    rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    rigidBody.resetForces(true);
-    rigidBody.resetTorques(true);
+    resetVehicleBody(rigidBody);
     wheelPosesRef.current.forEach((wheel) => {
       wheel.suspensionM = 0.47;
       wheel.spinRad = 0;
@@ -104,17 +87,17 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
       ref={bodyRef}
       name="generic-car-chassis"
       colliders={false}
-      position={[38, 0.9, 0]}
-      linearDamping={0.08}
-      angularDamping={0.5}
+      position={[VEHICLE_SPAWN.x, VEHICLE_SPAWN.y, VEHICLE_SPAWN.z]}
+      linearDamping={genericVehicle.linearDamping}
+      angularDamping={genericVehicle.angularDamping}
       ccd
       canSleep={false}
     >
       <CuboidCollider
         args={[genericVehicle.dimensionsM.widthM / 2, genericVehicle.dimensionsM.heightM / 2, genericVehicle.dimensionsM.lengthM / 2]}
         massProperties={rigidBodyMassProperties}
-        friction={0.72}
-        restitution={0.08}
+        friction={VEHICLE_COLLIDER_FRICTION}
+        restitution={VEHICLE_COLLIDER_RESTITUTION}
       />
       <group>
         <mesh position={[0, 0.12, -0.04]} castShadow receiveShadow>

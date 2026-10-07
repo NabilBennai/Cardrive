@@ -1,6 +1,6 @@
 # Cardrive — Dossier d’architecture
 
-Statut : architecture cible ; fondation et véhicule de l’étape 1 implémentés.
+Statut : architecture cible ; étape 1 implémentée et calibration numérique de l’étape 2 livrée, validation de conduite dans le navigateur restante.
 Langue de l’interface initiale : français.
 Déploiement cible : application statique sur Vercel, sans backend applicatif.
 
@@ -233,7 +233,7 @@ Avant chaque livraison de code : lint, vérification TypeScript, tests pertinent
 | 6 — Catalogue | Plusieurs configurations et modèles autorisés | Différences FWD/RWD/AWD perceptibles ; changement de voiture sans réécriture du solveur |
 | 7 — Finition | Audio, manette, réglages et déploiement | Parcours utilisateur vérifié et version statique déployable sur Vercel |
 
-L’étape 1 est implémentée dans les frontières de modules décrites ici. Son modèle physique initial et ses limites sont détaillés dans [step-1-vehicle.md](step-1-vehicle.md). La conduite réelle et les cadences de rendu restent à valider sur un navigateur WebGL de bureau avant d’entamer la calibration de l’étape 2. OSM, trafic et catalogue automobile restent hors de l’étape 1.
+L’étape 1 est décrite dans [step-1-vehicle.md](step-1-vehicle.md). La calibration de l’étape 2, ses équations, réglages et mesures Rapier à 30/60/120 FPS synthétiques sont détaillés dans [step-2-calibration.md](step-2-calibration.md), avec un [rapport numérique reproductible](calibration-results.json). La sensation de conduite et les cadences WebGL réelles restent à valider sur un navigateur de bureau. OSM, trafic et catalogue automobile restent hors de ces deux étapes.
 
 ## 13. Points à trancher pendant l’implémentation
 

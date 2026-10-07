@@ -1,0 +1,1646 @@
+{
+  "generatedAt": "2026-10-07T19:46:50.345Z",
+  "environment": {
+    "node": "v22.23.1",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "physicsHz": 60,
+  "rapierVersion": "0.19.2",
+  "vehicleConfig": {
+    "id": "cardrive-generic-rwd",
+    "displayName": "Prototype R-01",
+    "visualAssetRef": null,
+    "assetProvenance": "Carrosserie et roues procédurales originales, aucun modèle tiers.",
+    "massKg": 1180,
+    "dimensionsM": {
+      "lengthM": 3.56,
+      "widthM": 1.82,
+      "heightM": 1.04
+    },
+    "centerOfGravityM": {
+      "xM": 0,
+      "yM": -0.08,
+      "zM": 0
+    },
+    "principalInertiaKgM2": {
+      "xM": 540,
+      "yM": 1850,
+      "zM": 1650
+    },
+    "wheelbaseM": 2.2,
+    "trackWidthM": 1.38,
+    "wheelRadiusM": 0.34,
+    "wheelInertiaKgM2": 1.25,
+    "wheelMounts": [
+      {
+        "xM": -0.69,
+        "zM": 1.1,
+        "front": true,
+        "driven": false
+      },
+      {
+        "xM": 0.69,
+        "zM": 1.1,
+        "front": true,
+        "driven": false
+      },
+      {
+        "xM": -0.69,
+        "zM": -1.1,
+        "front": false,
+        "driven": true
+      },
+      {
+        "xM": 0.69,
+        "zM": -1.1,
+        "front": false,
+        "driven": true
+      }
+    ],
+    "suspensionRestLengthM": 0.57,
+    "suspensionTravelM": 0.3,
+    "springRateNPerM": 29000,
+    "damperNsPerM": 3200,
+    "torqueCurve": [
+      {
+        "rpm": 850,
+        "torqueNm": 185
+      },
+      {
+        "rpm": 1800,
+        "torqueNm": 230
+      },
+      {
+        "rpm": 3400,
+        "torqueNm": 260
+      },
+      {
+        "rpm": 5200,
+        "torqueNm": 220
+      },
+      {
+        "rpm": 6400,
+        "torqueNm": 150
+      }
+    ],
+    "idleRpm": 850,
+    "maximumRpm": 6400,
+    "maxSteeringRad": 0.48,
+    "steeringReductionPerMps": 0.032,
+    "tireGrip": 1.08,
+    "serviceBrakeForceN": 11000,
+    "handbrakeForceN": 5000,
+    "aerodynamicDragCoefficient": 0.32,
+    "frontalAreaM2": 2,
+    "gearRatios": [
+      3.15,
+      2.12,
+      1.48,
+      1.12,
+      0.86
+    ],
+    "reverseGearRatio": 3.05,
+    "finalDriveRatio": 3.55,
+    "drivetrainEfficiency": 0.84,
+    "engineBrakeTorqueNm": 32,
+    "launchRpm": 1800,
+    "engineResponsePerS": 8,
+    "upshiftRpm": 5700,
+    "downshiftRpm": 2000,
+    "shiftDurationS": 0.28,
+    "directionChangeSpeedMps": 0.35,
+    "directionChangeDelayS": 0.3,
+    "maximumReverseSpeedMps": 8,
+    "steeringRateRadPerS": 1.4,
+    "maximumCorneringAccelerationMps2": 7.5,
+    "tireCorneringStiffnessPerRad": 8,
+    "lowSpeedTireDampingNsPerM": 4600,
+    "frontBrakeBias": 0.64,
+    "handbrakeRearGripFactor": 0.6,
+    "rollingResistanceCoefficient": 0.012,
+    "maximumSuspensionForceN": 19000,
+    "minimumSuspensionLengthM": 0.12,
+    "linearDamping": 0.01,
+    "angularDamping": 0.5
+  },
+  "note": "Rapier headless, synthetic render cadence; no GPU/FPS benchmark or browser input validation.",
+  "checks": {
+    "finiteResults": true,
+    "noPersistentForces": true,
+    "cadenceIndependent": true,
+    "restingSupport": true,
+    "accelerationStable": true,
+    "brakingStopsWithoutReversing": true,
+    "sustainedBoundedReverse": true,
+    "directionChange": true,
+    "turningStable": true,
+    "bumpBounded": true,
+    "collisionBlocked": true,
+    "respawnRestored": true
+  },
+  "cadenceDeltas": [
+    {
+      "scenario": "repos",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "acceleration",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "freinage-100-kmh",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "recul",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "recul-vers-avant",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "virage",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "slalom",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "frein-main",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "bosse",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "collision",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "respawn",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    },
+    {
+      "scenario": "pause-reprise",
+      "maximumPositionDeltaM": 0,
+      "maximumSpeedDeltaMps": 0
+    }
+  ],
+  "results": [
+    {
+      "scenario": "repos",
+      "fps": 30,
+      "steps": 900,
+      "pathM": 0,
+      "minimumHeightM": 0.8966785669326782,
+      "maximumHeightM": 0.8997014760971069,
+      "maximumSpeedKmh": 0,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 0,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969795107841492,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130485609173775,
+        "z": 0
+      },
+      "finalRpm": 850,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "repos",
+      "fps": 60,
+      "steps": 900,
+      "pathM": 0,
+      "minimumHeightM": 0.8966785669326782,
+      "maximumHeightM": 0.8997014760971069,
+      "maximumSpeedKmh": 0,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 0,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969795107841492,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130485609173775,
+        "z": 0
+      },
+      "finalRpm": 850,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "repos",
+      "fps": 120,
+      "steps": 900,
+      "pathM": 0,
+      "minimumHeightM": 0.8966785669326782,
+      "maximumHeightM": 0.8997014760971069,
+      "maximumSpeedKmh": 0,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 0,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969795107841492,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130485609173775,
+        "z": 0
+      },
+      "finalRpm": 850,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "acceleration",
+      "fps": 30,
+      "steps": 1200,
+      "pathM": 589.6625366210938,
+      "minimumHeightM": 0.8959544897079468,
+      "maximumHeightM": 0.899616539478302,
+      "maximumSpeedKmh": 155.4543869018555,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 2.4898250547707512,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 3,
+      "finalGear": 4,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": 7.416666666666666,
+      "position": {
+        "x": 0,
+        "y": 0.8969019651412964,
+        "z": 589.6625366210938
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.061299461871385574,
+        "z": 43.1817741394043
+      },
+      "finalRpm": 4810.59509188406,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "acceleration",
+      "fps": 60,
+      "steps": 1200,
+      "pathM": 589.6625366210938,
+      "minimumHeightM": 0.8959544897079468,
+      "maximumHeightM": 0.899616539478302,
+      "maximumSpeedKmh": 155.4543869018555,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 2.4898250547707512,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 3,
+      "finalGear": 4,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": 7.416666666666666,
+      "position": {
+        "x": 0,
+        "y": 0.8969019651412964,
+        "z": 589.6625366210938
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.061299461871385574,
+        "z": 43.1817741394043
+      },
+      "finalRpm": 4810.59509188406,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "acceleration",
+      "fps": 120,
+      "steps": 1200,
+      "pathM": 589.6625366210938,
+      "minimumHeightM": 0.8959544897079468,
+      "maximumHeightM": 0.899616539478302,
+      "maximumSpeedKmh": 155.4543869018555,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 2.4898250547707512,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 3,
+      "finalGear": 4,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": 7.416666666666666,
+      "position": {
+        "x": 0,
+        "y": 0.8969019651412964,
+        "z": 589.6625366210938
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.061299461871385574,
+        "z": 43.1817741394043
+      },
+      "finalRpm": 4810.59509188406,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "freinage-100-kmh",
+      "fps": 30,
+      "steps": 480,
+      "pathM": 46.578975677490234,
+      "minimumHeightM": 0.8949962258338928,
+      "maximumHeightM": 0.8994675874710083,
+      "maximumSpeedKmh": 99.431103515625,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 3.339743703697429,
+      "minimumWorldZSpeedMps": -0.0742688924074173,
+      "maximumSlip": 0.9555418992060345,
+      "gearChanges": 2,
+      "finalGear": 1,
+      "stopTimeS": 3.3833333333333333,
+      "stopDistanceM": 46.547119140625,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969789743423462,
+        "z": 46.53611373901367
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130010262131691,
+        "z": -0.0018560128519311547
+      },
+      "finalRpm": 850.0000000000005,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "freinage-100-kmh",
+      "fps": 60,
+      "steps": 480,
+      "pathM": 46.578975677490234,
+      "minimumHeightM": 0.8949962258338928,
+      "maximumHeightM": 0.8994675874710083,
+      "maximumSpeedKmh": 99.431103515625,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 3.339743703697429,
+      "minimumWorldZSpeedMps": -0.0742688924074173,
+      "maximumSlip": 0.9555418992060345,
+      "gearChanges": 2,
+      "finalGear": 1,
+      "stopTimeS": 3.3833333333333333,
+      "stopDistanceM": 46.547119140625,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969789743423462,
+        "z": 46.53611373901367
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130010262131691,
+        "z": -0.0018560128519311547
+      },
+      "finalRpm": 850.0000000000005,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "freinage-100-kmh",
+      "fps": 120,
+      "steps": 480,
+      "pathM": 46.578975677490234,
+      "minimumHeightM": 0.8949962258338928,
+      "maximumHeightM": 0.8994675874710083,
+      "maximumSpeedKmh": 99.431103515625,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 3.339743703697429,
+      "minimumWorldZSpeedMps": -0.0742688924074173,
+      "maximumSlip": 0.9555418992060345,
+      "gearChanges": 2,
+      "finalGear": 1,
+      "stopTimeS": 3.3833333333333333,
+      "stopDistanceM": 46.547119140625,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969789743423462,
+        "z": 46.53611373901367
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130010262131691,
+        "z": -0.0018560128519311547
+      },
+      "finalRpm": 850.0000000000005,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "recul",
+      "fps": 30,
+      "steps": 480,
+      "pathM": 52.485755920410156,
+      "minimumHeightM": 0.8964437246322632,
+      "maximumHeightM": 0.8997014760971069,
+      "maximumSpeedKmh": 28.57082176208496,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 1.5392788876443024,
+      "minimumWorldZSpeedMps": -7.936339378356934,
+      "maximumSlip": 0.19717496040339322,
+      "gearChanges": 1,
+      "finalGear": -1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969787955284119,
+        "z": -52.485755920410156
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130119040608406,
+        "z": -7.936338901519775
+      },
+      "finalRpm": 2413.4498565477547,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "recul",
+      "fps": 60,
+      "steps": 480,
+      "pathM": 52.485755920410156,
+      "minimumHeightM": 0.8964437246322632,
+      "maximumHeightM": 0.8997014760971069,
+      "maximumSpeedKmh": 28.57082176208496,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 1.5392788876443024,
+      "minimumWorldZSpeedMps": -7.936339378356934,
+      "maximumSlip": 0.19717496040339322,
+      "gearChanges": 1,
+      "finalGear": -1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969787955284119,
+        "z": -52.485755920410156
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130119040608406,
+        "z": -7.936338901519775
+      },
+      "finalRpm": 2413.4498565477547,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "recul",
+      "fps": 120,
+      "steps": 480,
+      "pathM": 52.485755920410156,
+      "minimumHeightM": 0.8964437246322632,
+      "maximumHeightM": 0.8997014760971069,
+      "maximumSpeedKmh": 28.57082176208496,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 1.5392788876443024,
+      "minimumWorldZSpeedMps": -7.936339378356934,
+      "maximumSlip": 0.19717496040339322,
+      "gearChanges": 1,
+      "finalGear": -1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969787955284119,
+        "z": -52.485755920410156
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130119040608406,
+        "z": -7.936338901519775
+      },
+      "finalRpm": 2413.4498565477547,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "recul-vers-avant",
+      "fps": 30,
+      "steps": 720,
+      "pathM": 109.31521606445312,
+      "minimumHeightM": 0.8957663178443909,
+      "maximumHeightM": 0.8997014760971069,
+      "maximumSpeedKmh": 86.72987823486328,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 2.8274085862838136,
+      "minimumWorldZSpeedMps": -7.936286449432373,
+      "maximumSlip": 0.9336438558129936,
+      "gearChanges": 3,
+      "finalGear": 2,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8966939449310303,
+        "z": 42.86670684814453
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06126747652888298,
+        "z": 24.091632843017578
+      },
+      "finalRpm": 5005.21840869852,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "recul-vers-avant",
+      "fps": 60,
+      "steps": 720,
+      "pathM": 109.31521606445312,
+      "minimumHeightM": 0.8957663178443909,
+      "maximumHeightM": 0.8997014760971069,
+      "maximumSpeedKmh": 86.72987823486328,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 2.8274085862838136,
+      "minimumWorldZSpeedMps": -7.936286449432373,
+      "maximumSlip": 0.9336438558129936,
+      "gearChanges": 3,
+      "finalGear": 2,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8966939449310303,
+        "z": 42.86670684814453
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06126747652888298,
+        "z": 24.091632843017578
+      },
+      "finalRpm": 5005.21840869852,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "recul-vers-avant",
+      "fps": 120,
+      "steps": 720,
+      "pathM": 109.31521606445312,
+      "minimumHeightM": 0.8957663178443909,
+      "maximumHeightM": 0.8997014760971069,
+      "maximumSpeedKmh": 86.72987823486328,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 2.8274085862838136,
+      "minimumWorldZSpeedMps": -7.936286449432373,
+      "maximumSlip": 0.9336438558129936,
+      "gearChanges": 3,
+      "finalGear": 2,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8966939449310303,
+        "z": 42.86670684814453
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06126747652888298,
+        "z": 24.091632843017578
+      },
+      "finalRpm": 5005.21840869852,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "virage",
+      "fps": 30,
+      "steps": 600,
+      "pathM": 137.60278614561858,
+      "minimumHeightM": 0.8957229256629944,
+      "maximumHeightM": 0.8996953368186951,
+      "maximumSpeedKmh": 60.58581333795584,
+      "maximumRollDeg": 2.9490049870361004,
+      "maximumPitchDeg": 0.42868651286579335,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0.02900267797962379,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 96.2773208618164,
+        "y": 0.8962786793708801,
+        "z": 81.65478515625
+      },
+      "velocity": {
+        "x": 16.73390007019043,
+        "y": -0.06129183620214462,
+        "z": 1.7902635335922241
+      },
+      "finalRpm": 5264.9205387440325,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "virage",
+      "fps": 60,
+      "steps": 600,
+      "pathM": 137.60278614561858,
+      "minimumHeightM": 0.8957229256629944,
+      "maximumHeightM": 0.8996953368186951,
+      "maximumSpeedKmh": 60.58581333795584,
+      "maximumRollDeg": 2.9490049870361004,
+      "maximumPitchDeg": 0.42868651286579335,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0.02900267797962379,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 96.2773208618164,
+        "y": 0.8962786793708801,
+        "z": 81.65478515625
+      },
+      "velocity": {
+        "x": 16.73390007019043,
+        "y": -0.06129183620214462,
+        "z": 1.7902635335922241
+      },
+      "finalRpm": 5264.9205387440325,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "virage",
+      "fps": 120,
+      "steps": 600,
+      "pathM": 137.60278614561858,
+      "minimumHeightM": 0.8957229256629944,
+      "maximumHeightM": 0.8996953368186951,
+      "maximumSpeedKmh": 60.58581333795584,
+      "maximumRollDeg": 2.9490049870361004,
+      "maximumPitchDeg": 0.42868651286579335,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0.02900267797962379,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 96.2773208618164,
+        "y": 0.8962786793708801,
+        "z": 81.65478515625
+      },
+      "velocity": {
+        "x": 16.73390007019043,
+        "y": -0.06129183620214462,
+        "z": 1.7902635335922241
+      },
+      "finalRpm": 5264.9205387440325,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "slalom",
+      "fps": 30,
+      "steps": 720,
+      "pathM": 172.12887733030584,
+      "minimumHeightM": 0.894903838634491,
+      "maximumHeightM": 0.8996984958648682,
+      "maximumSpeedKmh": 63.49155023190385,
+      "maximumRollDeg": 3.797222873107509,
+      "maximumPitchDeg": 0.4451344570882077,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0.038377401158070756,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 35.882999420166016,
+        "y": 0.895551323890686,
+        "z": 167.58172607421875
+      },
+      "velocity": {
+        "x": 3.227810859680176,
+        "y": -0.061285533010959625,
+        "z": 17.338651657104492
+      },
+      "finalRpm": 5524.437522010937,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "slalom",
+      "fps": 60,
+      "steps": 720,
+      "pathM": 172.12887733030584,
+      "minimumHeightM": 0.894903838634491,
+      "maximumHeightM": 0.8996984958648682,
+      "maximumSpeedKmh": 63.49155023190385,
+      "maximumRollDeg": 3.797222873107509,
+      "maximumPitchDeg": 0.4451344570882077,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0.038377401158070756,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 35.882999420166016,
+        "y": 0.895551323890686,
+        "z": 167.58172607421875
+      },
+      "velocity": {
+        "x": 3.227810859680176,
+        "y": -0.061285533010959625,
+        "z": 17.338651657104492
+      },
+      "finalRpm": 5524.437522010937,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "slalom",
+      "fps": 120,
+      "steps": 720,
+      "pathM": 172.12887733030584,
+      "minimumHeightM": 0.894903838634491,
+      "maximumHeightM": 0.8996984958648682,
+      "maximumSpeedKmh": 63.49155023190385,
+      "maximumRollDeg": 3.797222873107509,
+      "maximumPitchDeg": 0.4451344570882077,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0.038377401158070756,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 35.882999420166016,
+        "y": 0.895551323890686,
+        "z": 167.58172607421875
+      },
+      "velocity": {
+        "x": 3.227810859680176,
+        "y": -0.061285533010959625,
+        "z": 17.338651657104492
+      },
+      "finalRpm": 5524.437522010937,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "frein-main",
+      "fps": 30,
+      "steps": 300,
+      "pathM": 47.89519195253788,
+      "minimumHeightM": 0.894112229347229,
+      "maximumHeightM": 0.8996955156326294,
+      "maximumSpeedKmh": 53.925396822067206,
+      "maximumRollDeg": 4.426576887935698,
+      "maximumPitchDeg": 1.1127419440688504,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 1.4200854855857445,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 17.00979995727539,
+        "y": 0.8967378735542297,
+        "z": 41.053043365478516
+      },
+      "velocity": {
+        "x": 3.0823516845703125,
+        "y": -0.060989897698163986,
+        "z": 0.5936225056648254
+      },
+      "finalRpm": 1093.2052128803857,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "frein-main",
+      "fps": 60,
+      "steps": 300,
+      "pathM": 47.89519195253788,
+      "minimumHeightM": 0.894112229347229,
+      "maximumHeightM": 0.8996955156326294,
+      "maximumSpeedKmh": 53.925396822067206,
+      "maximumRollDeg": 4.426576887935698,
+      "maximumPitchDeg": 1.1127419440688504,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 1.4200854855857445,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 17.00979995727539,
+        "y": 0.8967378735542297,
+        "z": 41.053043365478516
+      },
+      "velocity": {
+        "x": 3.0823516845703125,
+        "y": -0.060989897698163986,
+        "z": 0.5936225056648254
+      },
+      "finalRpm": 1093.2052128803857,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "frein-main",
+      "fps": 120,
+      "steps": 300,
+      "pathM": 47.89519195253788,
+      "minimumHeightM": 0.894112229347229,
+      "maximumHeightM": 0.8996955156326294,
+      "maximumSpeedKmh": 53.925396822067206,
+      "maximumRollDeg": 4.426576887935698,
+      "maximumPitchDeg": 1.1127419440688504,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 1.4200854855857445,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 17.00979995727539,
+        "y": 0.8967378735542297,
+        "z": 41.053043365478516
+      },
+      "velocity": {
+        "x": 3.0823516845703125,
+        "y": -0.060989897698163986,
+        "z": 0.5936225056648254
+      },
+      "finalRpm": 1093.2052128803857,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "bosse",
+      "fps": 30,
+      "steps": 360,
+      "pathM": 28.706188201904297,
+      "minimumHeightM": 0.8891499638557434,
+      "maximumHeightM": 0.9947249889373779,
+      "maximumSpeedKmh": 28.73383655548096,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 5.369280968761811,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969545960426331,
+        "z": 28.706188201904297
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130180135369301,
+        "z": 1.647799015045166
+      },
+      "finalRpm": 850.0120648232368,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "bosse",
+      "fps": 60,
+      "steps": 360,
+      "pathM": 28.706188201904297,
+      "minimumHeightM": 0.8891499638557434,
+      "maximumHeightM": 0.9947249889373779,
+      "maximumSpeedKmh": 28.73383655548096,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 5.369280968761811,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969545960426331,
+        "z": 28.706188201904297
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130180135369301,
+        "z": 1.647799015045166
+      },
+      "finalRpm": 850.0120648232368,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "bosse",
+      "fps": 120,
+      "steps": 360,
+      "pathM": 28.706188201904297,
+      "minimumHeightM": 0.8891499638557434,
+      "maximumHeightM": 0.9947249889373779,
+      "maximumSpeedKmh": 28.73383655548096,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 5.369280968761811,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969545960426331,
+        "z": 28.706188201904297
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130180135369301,
+        "z": 1.647799015045166
+      },
+      "finalRpm": 850.0120648232368,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "collision",
+      "fps": 30,
+      "steps": 480,
+      "pathM": 31.42400661347074,
+      "minimumHeightM": 0.8959544897079468,
+      "maximumHeightM": 0.9029700756072998,
+      "maximumSpeedKmh": 61.845618438720706,
+      "maximumRollDeg": 1.2632519342379471,
+      "maximumPitchDeg": 2.4898250547707512,
+      "minimumWorldZSpeedMps": -1.0301759243011475,
+      "maximumSlip": 0.21930715825311223,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": -0.06601323187351227,
+        "y": 0.8969789147377014,
+        "z": 24.330188751220703
+      },
+      "velocity": {
+        "x": -0.005532905925065279,
+        "y": -0.06130221113562584,
+        "z": -0.44160449504852295
+      },
+      "finalRpm": 1800.000000000001,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "collision",
+      "fps": 60,
+      "steps": 480,
+      "pathM": 31.42400661347074,
+      "minimumHeightM": 0.8959544897079468,
+      "maximumHeightM": 0.9029700756072998,
+      "maximumSpeedKmh": 61.845618438720706,
+      "maximumRollDeg": 1.2632519342379471,
+      "maximumPitchDeg": 2.4898250547707512,
+      "minimumWorldZSpeedMps": -1.0301759243011475,
+      "maximumSlip": 0.21930715825311223,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": -0.06601323187351227,
+        "y": 0.8969789147377014,
+        "z": 24.330188751220703
+      },
+      "velocity": {
+        "x": -0.005532905925065279,
+        "y": -0.06130221113562584,
+        "z": -0.44160449504852295
+      },
+      "finalRpm": 1800.000000000001,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "collision",
+      "fps": 120,
+      "steps": 480,
+      "pathM": 31.42400661347074,
+      "minimumHeightM": 0.8959544897079468,
+      "maximumHeightM": 0.9029700756072998,
+      "maximumSpeedKmh": 61.845618438720706,
+      "maximumRollDeg": 1.2632519342379471,
+      "maximumPitchDeg": 2.4898250547707512,
+      "minimumWorldZSpeedMps": -1.0301759243011475,
+      "maximumSlip": 0.21930715825311223,
+      "gearChanges": 0,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": -0.06601323187351227,
+        "y": 0.8969789147377014,
+        "z": 24.330188751220703
+      },
+      "velocity": {
+        "x": -0.005532905925065279,
+        "y": -0.06130221113562584,
+        "z": -0.44160449504852295
+      },
+      "finalRpm": 1800.000000000001,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "respawn",
+      "fps": 30,
+      "steps": 600,
+      "pathM": 62.1499137878418,
+      "minimumHeightM": 0.8959544897079468,
+      "maximumHeightM": 0.9016979932785034,
+      "maximumSpeedKmh": 80.12430725097657,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 2.4898250547707512,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 2,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969793319702148,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130323186516762,
+        "z": 0
+      },
+      "finalRpm": 850,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "respawn",
+      "fps": 60,
+      "steps": 600,
+      "pathM": 62.1499137878418,
+      "minimumHeightM": 0.8959544897079468,
+      "maximumHeightM": 0.9016979932785034,
+      "maximumSpeedKmh": 80.12430725097657,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 2.4898250547707512,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 2,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969793319702148,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130323186516762,
+        "z": 0
+      },
+      "finalRpm": 850,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "respawn",
+      "fps": 120,
+      "steps": 600,
+      "pathM": 62.1499137878418,
+      "minimumHeightM": 0.8959544897079468,
+      "maximumHeightM": 0.9016979932785034,
+      "maximumSpeedKmh": 80.12430725097657,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 2.4898250547707512,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 2,
+      "finalGear": 1,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969793319702148,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.06130323186516762,
+        "z": 0
+      },
+      "finalRpm": 850,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "pause-reprise",
+      "fps": 30,
+      "steps": 720,
+      "pathM": 137.7787628173828,
+      "minimumHeightM": 0.8965869545936584,
+      "maximumHeightM": 0.8996862769126892,
+      "maximumSpeedKmh": 75.28601760864258,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 1.0413808824185795,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 1,
+      "finalGear": 2,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969275951385498,
+        "z": 137.7787628173828
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.061299193650484085,
+        "z": 20.912782669067383
+      },
+      "finalRpm": 4388.711284705613,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "pause-reprise",
+      "fps": 60,
+      "steps": 720,
+      "pathM": 137.7787628173828,
+      "minimumHeightM": 0.8965869545936584,
+      "maximumHeightM": 0.8996862769126892,
+      "maximumSpeedKmh": 75.28601760864258,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 1.0413808824185795,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 1,
+      "finalGear": 2,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969275951385498,
+        "z": 137.7787628173828
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.061299193650484085,
+        "z": 20.912782669067383
+      },
+      "finalRpm": 4388.711284705613,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "scenario": "pause-reprise",
+      "fps": 120,
+      "steps": 720,
+      "pathM": 137.7787628173828,
+      "minimumHeightM": 0.8965869545936584,
+      "maximumHeightM": 0.8996862769126892,
+      "maximumSpeedKmh": 75.28601760864258,
+      "maximumRollDeg": 0,
+      "maximumPitchDeg": 1.0413808824185795,
+      "minimumWorldZSpeedMps": 0,
+      "maximumSlip": 0,
+      "gearChanges": 1,
+      "finalGear": 2,
+      "stopTimeS": null,
+      "stopDistanceM": null,
+      "zeroTo100S": null,
+      "position": {
+        "x": 0,
+        "y": 0.8969275951385498,
+        "z": 137.7787628173828
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.061299193650484085,
+        "z": 20.912782669067383
+      },
+      "finalRpm": 4388.711284705613,
+      "groundedWheels": 4,
+      "persistentForce": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "persistentTorque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    }
+  ]
+}

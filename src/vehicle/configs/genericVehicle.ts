@@ -19,12 +19,26 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
     config.damperNsPerM,
     config.maxSteeringRad,
     config.tireGrip,
-    config.tireLateralStiffnessNsPerM,
     config.serviceBrakeForceN,
     config.handbrakeForceN,
     config.frontalAreaM2,
     config.reverseGearRatio,
     config.finalDriveRatio,
+    config.drivetrainEfficiency,
+    config.launchRpm,
+    config.engineResponsePerS,
+    config.upshiftRpm,
+    config.downshiftRpm,
+    config.shiftDurationS,
+    config.directionChangeSpeedMps,
+    config.directionChangeDelayS,
+    config.maximumReverseSpeedMps,
+    config.steeringRateRadPerS,
+    config.maximumCorneringAccelerationMps2,
+    config.tireCorneringStiffnessPerRad,
+    config.lowSpeedTireDampingNsPerM,
+    config.maximumSuspensionForceN,
+    config.minimumSuspensionLengthM,
     ...config.gearRatios,
     ...config.torqueCurve.map((point) => point.rpm),
     ...config.torqueCurve.map((point) => point.torqueNm),
@@ -34,7 +48,7 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
   }
   if (config.wheelMounts.length !== 4
     || config.wheelMounts.filter((wheel) => wheel.front).length !== 2
-    || config.wheelMounts.filter((wheel) => wheel.driven && !wheel.front).length === 0
+    || !config.wheelMounts.some((wheel) => wheel.driven)
     || config.wheelMounts.some((wheel) => !Number.isFinite(wheel.xM) || !Number.isFinite(wheel.zM))) {
     throw new Error(`La configuration ${config.id} doit décrire quatre roues et au moins une roue motrice.`);
   }
@@ -42,11 +56,23 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
     || config.torqueCurve.some((point, index, curve) => index > 0 && point.rpm <= curve[index - 1].rpm)) {
     throw new Error(`La courbe de couple de ${config.id} doit être triée par régime croissant.`);
   }
-  if (config.idleRpm <= 0 || config.maximumRpm <= config.idleRpm
+  const nonnegative = [config.engineBrakeTorqueNm, config.steeringReductionPerMps,
+    config.aerodynamicDragCoefficient, config.rollingResistanceCoefficient, config.linearDamping, config.angularDamping];
+  if (!Number.isFinite(config.idleRpm) || !Number.isFinite(config.maximumRpm)
+    || config.idleRpm <= 0 || config.maximumRpm <= config.idleRpm
     || config.gearRatios.length === 0 || config.steeringReductionPerMps < 0
     || config.aerodynamicDragCoefficient < 0
     || !Number.isFinite(config.centerOfGravityM.xM + config.centerOfGravityM.yM + config.centerOfGravityM.zM)) {
     throw new Error(`Régimes ou rapports invalides pour ${config.id}.`);
+  }
+  if (nonnegative.some((value) => !Number.isFinite(value) || value < 0)
+    || !Number.isFinite(config.frontBrakeBias) || config.frontBrakeBias <= 0 || config.frontBrakeBias >= 1
+    || !Number.isFinite(config.handbrakeRearGripFactor) || config.handbrakeRearGripFactor <= 0 || config.handbrakeRearGripFactor > 1
+    || config.drivetrainEfficiency > 1
+    || config.downshiftRpm <= config.idleRpm || config.downshiftRpm >= config.upshiftRpm
+    || config.upshiftRpm >= config.maximumRpm || config.launchRpm < config.idleRpm || config.launchRpm >= config.upshiftRpm
+    || config.minimumSuspensionLengthM >= config.suspensionRestLengthM) {
+    throw new Error(`Paramètres de calibration invalides pour ${config.id}.`);
   }
   return config;
 }
@@ -86,14 +112,34 @@ const genericVehicleDefinition: VehicleConfig = {
   maxSteeringRad: 0.48,
   steeringReductionPerMps: 0.032,
   tireGrip: 1.08,
-  tireLateralStiffnessNsPerM: 4_600,
-  serviceBrakeForceN: 7_200,
-  handbrakeForceN: 5_800,
+  serviceBrakeForceN: 11_000,
+  handbrakeForceN: 5_000,
   aerodynamicDragCoefficient: 0.32,
   frontalAreaM2: 2.0,
   gearRatios: [3.15, 2.12, 1.48, 1.12, 0.86],
   reverseGearRatio: 3.05,
   finalDriveRatio: 3.55,
+  drivetrainEfficiency: 0.84,
+  engineBrakeTorqueNm: 32,
+  launchRpm: 1_800,
+  engineResponsePerS: 8,
+  upshiftRpm: 5_700,
+  downshiftRpm: 2_000,
+  shiftDurationS: 0.28,
+  directionChangeSpeedMps: 0.35,
+  directionChangeDelayS: 0.3,
+  maximumReverseSpeedMps: 8,
+  steeringRateRadPerS: 1.4,
+  maximumCorneringAccelerationMps2: 7.5,
+  tireCorneringStiffnessPerRad: 8,
+  lowSpeedTireDampingNsPerM: 4_600,
+  frontBrakeBias: 0.64,
+  handbrakeRearGripFactor: 0.6,
+  rollingResistanceCoefficient: 0.012,
+  maximumSuspensionForceN: 19_000,
+  minimumSuspensionLengthM: 0.12,
+  linearDamping: 0.01,
+  angularDamping: 0.5,
 };
 
 export const genericVehicle = validateVehicleConfig(genericVehicleDefinition);

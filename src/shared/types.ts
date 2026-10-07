@@ -87,7 +87,6 @@ export interface VehicleConfig {
   maxSteeringRad: number;
   steeringReductionPerMps: number;
   tireGrip: number;
-  tireLateralStiffnessNsPerM: number;
   serviceBrakeForceN: number;
   handbrakeForceN: number;
   aerodynamicDragCoefficient: number;
@@ -95,4 +94,25 @@ export interface VehicleConfig {
   gearRatios: number[];
   reverseGearRatio: number;
   finalDriveRatio: number;
+  drivetrainEfficiency: number;
+  engineBrakeTorqueNm: number;
+  launchRpm: number;
+  engineResponsePerS: number;
+  upshiftRpm: number;
+  downshiftRpm: number;
+  shiftDurationS: number;
+  directionChangeSpeedMps: number;
+  directionChangeDelayS: number;
+  maximumReverseSpeedMps: number;
+  steeringRateRadPerS: number;
+  maximumCorneringAccelerationMps2: number;
+  tireCorneringStiffnessPerRad: number;
+  lowSpeedTireDampingNsPerM: number;
+  frontBrakeBias: number;
+  handbrakeRearGripFactor: number;
+  rollingResistanceCoefficient: number;
+  maximumSuspensionForceN: number;
+  minimumSuspensionLengthM: number;
+  linearDamping: number;
+  angularDamping: number;
 }
