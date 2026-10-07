@@ -1,6 +1,6 @@
 # Cardrive — Dossier d’architecture
 
-Statut : architecture cible, avant implémentation.
+Statut : architecture cible ; fondation et véhicule de l’étape 1 implémentés.
 Langue de l’interface initiale : français.
 Déploiement cible : application statique sur Vercel, sans backend applicatif.
 
@@ -233,7 +233,7 @@ Avant chaque livraison de code : lint, vérification TypeScript, tests pertinent
 | 6 — Catalogue | Plusieurs configurations et modèles autorisés | Différences FWD/RWD/AWD perceptibles ; changement de voiture sans réécriture du solveur |
 | 7 — Finition | Audio, manette, réglages et déploiement | Parcours utilisateur vérifié et version statique déployable sur Vercel |
 
-Mission suivante pour Codex : implémenter uniquement l’étape 1, en suivant les frontières de modules de ce dossier. Ne pas intégrer OSM, trafic ou catalogue automobile pendant cette étape.
+L’étape 1 est implémentée dans les frontières de modules décrites ici. Son modèle physique initial et ses limites sont détaillés dans [step-1-vehicle.md](step-1-vehicle.md). La conduite réelle et les cadences de rendu restent à valider sur un navigateur WebGL de bureau avant d’entamer la calibration de l’étape 2. OSM, trafic et catalogue automobile restent hors de l’étape 1.
 
 ## 13. Points à trancher pendant l’implémentation
 
@@ -243,4 +243,4 @@ Mission suivante pour Codex : implémenter uniquement l’étape 1, en suivant l
 - Source d’altitude si le relief et les ouvrages deviennent nécessaires.
 - Assets automobiles et conditions de redistribution vérifiés avant publication.
 
-Ce dossier décrit des décisions de conception et des critères de livraison. Il ne signifie pas que le moteur, la physique ou les accès aux fournisseurs sont déjà implémentés ou validés.
+Ce dossier conserve les décisions de conception et les critères de livraison des étapes restantes. La présence d’un critère dans le plan ne signifie pas qu’il est déjà implémenté ou validé.
