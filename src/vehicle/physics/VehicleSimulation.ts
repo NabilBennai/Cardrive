@@ -120,7 +120,7 @@ export class VehicleSimulation {
     const speedLimitedAngle = Math.atan(c.maximumCorneringAccelerationMps2 * c.wheelbaseM / Math.max(1, speedMps ** 2));
     const maxSteer = Math.min(c.maxSteeringRad / (1 + speedMps * c.steeringReductionPerMps), speedLimitedAngle);
     this.steeringRad = moveTowards(this.steeringRad, clamp(input.steering, -1, 1) * maxSteer, c.steeringRateRadPerS * dt);
-    this.steerRotation.setFromAxisAngle(this.up, this.steeringRad);
+    this.steerRotation.setFromAxisAngle(this.up, -this.steeringRad);
     let groundedWheels = 0;
     let slip = 0;
 
@@ -130,7 +130,7 @@ export class VehicleSimulation {
       const pose = this.wheelPoses[index];
       const pending = this.impulses[index];
       pending.impulse.set(0, 0, 0);
-      pose.steeringRad = wheel.front ? this.steeringRad : 0;
+      pose.steeringRad = wheel.front ? -this.steeringRad : 0;
       this.mount.set(wheel.xM, -0.08, wheel.zM).applyQuaternion(this.rotation).add(this.position);
       this.ray.origin.x = this.mount.x;
       this.ray.origin.y = this.mount.y;
