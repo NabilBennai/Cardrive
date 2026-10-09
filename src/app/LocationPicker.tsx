@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { PREDEFINED_PLACES } from '../map/predefinedPlaces';
 import { MIN_QUERY_LENGTH, searchAddress, type GeocodeResult } from '../map/geocodeProvider';
 import type { GeoPoint } from '../shared/types';
 
@@ -73,19 +72,6 @@ export function LocationPicker({ onChoosePlace, onUseDemoTrack, onBack }: Locati
               ))}
             </ul>
           )}
-        </div>
-
-        <div className="location-list" role="list">
-          {PREDEFINED_PLACES.map((place) => (
-            <button
-              key={place.label}
-              className="location-option"
-              role="listitem"
-              onClick={() => choose({ latitudeDeg: place.latitudeDeg, longitudeDeg: place.longitudeDeg }, place.label)}
-            >
-              {place.label}
-            </button>
-          ))}
         </div>
 
         <div className="location-footer">

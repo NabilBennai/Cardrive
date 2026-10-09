@@ -1,13 +1,17 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { RapierRigidBody } from '@react-three/rapier';
 import { useDrivingInput } from '../input/useDrivingInput';
+import { useTouchDrivingInput } from '../input/useTouchDrivingInput';
 import type { GeoPoint, VehicleTelemetry } from '../shared/types';
 import { DrivingHUD } from '../ui/DrivingHUD';
+import { TouchControls } from '../ui/TouchControls';
 import { LocationPicker } from './LocationPicker';
 import { GeoLoadingScreen, type GeoLoadingScreenState } from './GeoLoadingScreen';
 import { GeoLoadError, loadRoadWorld, type LoadedRoadWorld } from './geoOrchestrator';
 import type { DrivingWorld } from './DrivingScene';
 import { Minimap } from '../ui/Minimap';
+
+const isTouchDevice = typeof window !== 'undefined' && (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
 
 const DrivingScene = lazy(() => import('./DrivingScene').then(({ DrivingScene: scene }) => ({ default: scene })));
 
@@ -59,7 +63,9 @@ export function App() {
   const telemetryRef = useRef(idleTelemetry);
   const pauseGame = useCallback(() => setPaused((value) => !value), []);
   const respawn = useCallback(() => setRespawnVersion((value) => value + 1), []);
-  const input = useDrivingInput(playing, paused || tabHidden, gameFocus, pauseGame, respawn);
+  const keyboardInput = useDrivingInput(playing, paused || tabHidden, gameFocus, pauseGame, respawn);
+  const touchInput = useTouchDrivingInput(playing, paused || tabHidden);
+  const input = isTouchDevice ? touchInput.inputRef : keyboardInput;
 
   // Étape 3 : choix du lieu, chargement OSM/Overpass, piste de démo toujours disponible hors ligne.
   const [showLocationPicker, setShowLocationPicker] = useState(false);
@@ -132,7 +138,7 @@ export function App() {
 
   return (
     <main
-      className="game-shell"
+      className={isTouchDevice ? 'game-shell has-touch-controls' : 'game-shell'}
       ref={gameFocus}
       tabIndex={0}
       onPointerDown={(event) => {
@@ -203,6 +209,10 @@ export function App() {
       )}
 
       {playing && <DrivingHUD telemetry={telemetry} paused={paused || tabHidden} onPause={pauseGame} onRespawn={respawn} />}
+
+      {playing && isTouchDevice && !(paused || tabHidden) && (
+        <TouchControls setStick={touchInput.setStick} setHandbrake={touchInput.setHandbrake} />
+      )}
 
       {playing && !useDemoTrack && lastPlace && (
         <div className="minimap-panel">

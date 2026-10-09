@@ -1,21 +1,6 @@
 import type { GeoPoint } from '../shared/types.ts';
 import type { GeoBounds } from './geoProvider.ts';
 
-export interface PredefinedPlace {
-  label: string;
-  latitudeDeg: number;
-  longitudeDeg: number;
-}
-
-/** Doc §7 : « Latitude/longitude manuelles et quelques lieux prédéfinis précèdent la recherche
- *  textuelle. » Un lieu simple (une rue) et un complexe (carrefour à nombreuses branches), pour
- *  valider les deux cas dès le premier test manuel. La recherche d'adresse (geocodeProvider.ts)
- *  couvre désormais le cas général ; cette liste reste comme raccourcis rapides. */
-export const PREDEFINED_PLACES: PredefinedPlace[] = [
-  { label: 'Mont-Saint-Michel (ruelle unique)', latitudeDeg: 48.6361, longitudeDeg: -1.5115 },
-  { label: 'Arc de Triomphe, Paris (carrefour complexe)', latitudeDeg: 48.8738, longitudeDeg: 2.2950 },
-];
-
 const METERS_PER_DEGREE_LATITUDE = 111_320;
 const DEFAULT_MARGIN_M = 400;
 

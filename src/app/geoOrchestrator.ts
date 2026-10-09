@@ -1,7 +1,7 @@
 import type { GeoAnchor } from '../geo/projection.ts';
 import { GeoProviderError, type GeoProviderErrorKind, type RawOsmData } from '../map/geoProvider.ts';
 import { openGeoCache, readGeoCache, writeGeoCache } from '../map/geoCache.ts';
-import { boundsAroundPoint } from '../map/predefinedPlaces.ts';
+import { boundsAroundPoint } from '../map/geoBounds.ts';
 import { OverpassProvider } from '../map/overpassProvider.ts';
 import { buildRoadGraph, EmptyRoadZoneError, type RoadGraph } from '../world/roads/roadGraph.ts';
 import { pickSpawnPose, type RoadSpawnPose } from '../world/roads/spawnPlacement.ts';
