@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PREDEFINED_PLACES } from '../map/predefinedPlaces';
+import { MIN_QUERY_LENGTH, searchAddress, type GeocodeResult } from '../map/geocodeProvider';
 import type { GeoPoint } from '../shared/types';
 
 interface LocationPickerProps {
@@ -8,15 +9,39 @@ interface LocationPickerProps {
   onBack: () => void;
 }
 
-export function LocationPicker({ onChoosePlace, onUseDemoTrack, onBack }: LocationPickerProps) {
-  const [latitudeText, setLatitudeText] = useState('');
-  const [longitudeText, setLongitudeText] = useState('');
+const SEARCH_DEBOUNCE_MS = 450;
 
-  const submitManual = () => {
-    const latitudeDeg = Number.parseFloat(latitudeText);
-    const longitudeDeg = Number.parseFloat(longitudeText);
-    if (!Number.isFinite(latitudeDeg) || !Number.isFinite(longitudeDeg)) return;
-    onChoosePlace({ latitudeDeg, longitudeDeg }, `${latitudeDeg.toFixed(4)}, ${longitudeDeg.toFixed(4)}`);
+export function LocationPicker({ onChoosePlace, onUseDemoTrack, onBack }: LocationPickerProps) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<GeocodeResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const queryLongEnough = query.trim().length >= MIN_QUERY_LENGTH;
+
+  useEffect(() => {
+    abortRef.current?.abort();
+    if (!queryLongEnough) return;
+    const timer = setTimeout(() => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setSearching(true);
+      setSearchError(false);
+      searchAddress(query, controller.signal)
+        .then((found) => { if (!controller.signal.aborted) { setResults(found); setSearching(false); } })
+        .catch(() => { if (!controller.signal.aborted) { setSearchError(true); setSearching(false); } });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query, queryLongEnough]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const choose = (place: GeoPoint, label: string) => {
+    abortRef.current?.abort();
+    setResults([]);
+    setQuery('');
+    onChoosePlace(place, label);
   };
 
   return (
@@ -24,7 +49,31 @@ export function LocationPicker({ onChoosePlace, onUseDemoTrack, onBack }: Locati
       <div className="start-copy">
         <p className="overline"><i /> ÉTAPE 3 · ZONE RÉELLE (BÊTA)</p>
         <h1>Choisissez<br /><em>une route.</em></h1>
-        <p className="intro-copy">Les routes viennent d’OpenStreetMap via Overpass : une requête réseau bornée à une petite zone autour du point choisi.</p>
+        <p className="intro-copy">Les routes viennent d’OpenStreetMap via Overpass : une requête réseau bornée à une petite zone autour de l’adresse choisie.</p>
+
+        <div className="location-search">
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Rechercher une adresse, une ville…"
+            aria-label="Rechercher une adresse"
+            autoComplete="off"
+          />
+          {queryLongEnough && searching && <p className="location-search-status">Recherche…</p>}
+          {queryLongEnough && searchError && <p className="location-search-status">Recherche indisponible, réessayez.</p>}
+          {queryLongEnough && results.length > 0 && (
+            <ul className="location-suggestions" role="listbox">
+              {results.map((result) => (
+                <li key={`${result.point.latitudeDeg},${result.point.longitudeDeg}`}>
+                  <button className="location-option" role="option" onClick={() => choose(result.point, result.label)}>
+                    {result.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="location-list" role="list">
           {PREDEFINED_PLACES.map((place) => (
@@ -32,23 +81,11 @@ export function LocationPicker({ onChoosePlace, onUseDemoTrack, onBack }: Locati
               key={place.label}
               className="location-option"
               role="listitem"
-              onClick={() => onChoosePlace({ latitudeDeg: place.latitudeDeg, longitudeDeg: place.longitudeDeg }, place.label)}
+              onClick={() => choose({ latitudeDeg: place.latitudeDeg, longitudeDeg: place.longitudeDeg }, place.label)}
             >
               {place.label}
             </button>
           ))}
-        </div>
-
-        <div className="location-manual">
-          <label>
-            LATITUDE
-            <input type="number" step="any" value={latitudeText} onChange={(event) => setLatitudeText(event.target.value)} placeholder="48.8738" />
-          </label>
-          <label>
-            LONGITUDE
-            <input type="number" step="any" value={longitudeText} onChange={(event) => setLongitudeText(event.target.value)} placeholder="2.2950" />
-          </label>
-          <button className="start-button" onClick={submitManual}><span>CHARGER CETTE ZONE</span><b>↗</b></button>
         </div>
 
         <div className="location-footer">

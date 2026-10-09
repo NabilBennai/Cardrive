@@ -9,13 +9,9 @@ export interface PredefinedPlace {
 
 /** Doc §7 : « Latitude/longitude manuelles et quelques lieux prédéfinis précèdent la recherche
  *  textuelle. » Un lieu simple (une rue) et un complexe (carrefour à nombreuses branches), pour
- *  valider les deux cas dès le premier test manuel.
- *  Le premier (par défaut) est le quartier Sainte-Croix à Bayonne, ex-ZUP (Zone à Urbaniser en
- *  Priorité) — coordonnées vérifiées via Nominatim/OpenStreetMap, aucun périmètre officiel
- *  précis de l'ancienne ZUP n'étant publié ; c'est le centre du quartier prioritaire actuel
- *  (QP064002) qui lui correspond le plus directement. */
+ *  valider les deux cas dès le premier test manuel. La recherche d'adresse (geocodeProvider.ts)
+ *  couvre désormais le cas général ; cette liste reste comme raccourcis rapides. */
 export const PREDEFINED_PLACES: PredefinedPlace[] = [
-  { label: 'ZUP de Bayonne (quartier Sainte-Croix)', latitudeDeg: 43.499018, longitudeDeg: -1.4554525 },
   { label: 'Mont-Saint-Michel (ruelle unique)', latitudeDeg: 48.6361, longitudeDeg: -1.5115 },
   { label: 'Arc de Triomphe, Paris (carrefour complexe)', latitudeDeg: 48.8738, longitudeDeg: 2.2950 },
 ];
