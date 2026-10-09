@@ -16,6 +16,9 @@ export interface VehicleTelemetry {
   steering: number;
   /** Température de carcasse par roue, ordre wheelMounts (avant-gauche, avant-droit, arrière-gauche, arrière-droit). */
   tireTemperaturesC: number[];
+  /** Position locale du châssis (mètres, repère de la zone chargée) et lacet (rad, atan2(forward.x, forward.z)) : pour la mini-carte. */
+  positionM: { xM: number; zM: number };
+  headingRad: number;
 }
 
 export interface VehicleSnapshot {

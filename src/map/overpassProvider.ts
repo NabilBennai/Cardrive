@@ -1,7 +1,15 @@
 import { GeoProviderError, type GeoBounds, type GeoProvider, type RawOsmData, type RawOsmNode, type RawOsmWay } from './geoProvider.ts';
 
-const DEFAULT_OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
-const OVERPASS_URL = import.meta.env.VITE_OVERPASS_URL ?? DEFAULT_OVERPASS_URL;
+// Plusieurs miroirs publics, essayés dans l'ordre : l'instance officielle sature/rate-limit
+// facilement sous usage ponctuel (observé en session : « Service saturé » sur une seule
+// requête). kumi.systems et osm.ch sont des miroirs communautaires réputés plus disponibles
+// pour ce genre d'usage. Si VITE_OVERPASS_URL est défini, il est seul utilisé (pas de repli).
+const DEFAULT_OVERPASS_URLS = [
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.osm.ch/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+];
+const OVERPASS_URLS = import.meta.env.VITE_OVERPASS_URL ? [import.meta.env.VITE_OVERPASS_URL] : DEFAULT_OVERPASS_URLS;
 const OVERPASS_TIMEOUT_S = 25;
 const CLIENT_TIMEOUT_MS = (OVERPASS_TIMEOUT_S + 5) * 1_000;
 
@@ -51,48 +59,64 @@ function parseOverpassResponse(body: unknown): RawOsmData {
   return { nodes, ways };
 }
 
-/** Seule implémentation concrète de GeoProvider pour cette étape : l'API Overpass publique. */
+async function fetchFrom(baseUrl: string, query: string, signal: AbortSignal): Promise<RawOsmData> {
+  const timeoutController = new AbortController();
+  const forwardAbort = () => timeoutController.abort();
+  signal.addEventListener('abort', forwardAbort);
+  const timeoutId = setTimeout(forwardAbort, CLIENT_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(baseUrl, {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: timeoutController.signal,
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw new GeoProviderError('network', 'Impossible de joindre le fournisseur de cartes.', { cause: error });
+  } finally {
+    clearTimeout(timeoutId);
+    signal.removeEventListener('abort', forwardAbort);
+  }
+
+  if (response.status === 429 || response.status === 504) {
+    throw new GeoProviderError('rate-limited', `Le fournisseur limite les requêtes (HTTP ${response.status}).`);
+  }
+  if (!response.ok) {
+    throw new GeoProviderError('http', `Le fournisseur a répondu HTTP ${response.status}.`);
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error) {
+    throw new GeoProviderError('malformed-response', 'La réponse Overpass n\'est pas un JSON valide.', { cause: error });
+  }
+  return parseOverpassResponse(body);
+}
+
+/** Seule implémentation concrète de GeoProvider pour cette étape : l'API Overpass publique, avec repli sur plusieurs miroirs. */
 export class OverpassProvider implements GeoProvider {
   readonly id = 'overpass';
 
-  constructor(private readonly baseUrl: string = OVERPASS_URL) {}
+  constructor(private readonly baseUrls: string[] = OVERPASS_URLS) {}
 
   async getRoads(bounds: GeoBounds, signal: AbortSignal): Promise<RawOsmData> {
     const query = buildOverpassQuery(bounds);
-    const timeoutController = new AbortController();
-    const forwardAbort = () => timeoutController.abort();
-    signal.addEventListener('abort', forwardAbort);
-    const timeoutId = setTimeout(forwardAbort, CLIENT_TIMEOUT_MS);
-
-    let response: Response;
-    try {
-      response = await fetch(this.baseUrl, {
-        method: 'POST',
-        body: `data=${encodeURIComponent(query)}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        signal: timeoutController.signal,
-      });
-    } catch (error) {
-      if (signal.aborted) throw error;
-      throw new GeoProviderError('network', 'Impossible de joindre le fournisseur de cartes.', { cause: error });
-    } finally {
-      clearTimeout(timeoutId);
-      signal.removeEventListener('abort', forwardAbort);
+    let lastError: unknown;
+    for (const baseUrl of this.baseUrls) {
+      if (signal.aborted) throw lastError ?? new GeoProviderError('network', 'Requête annulée.');
+      try {
+        return await fetchFrom(baseUrl, query, signal);
+      } catch (error) {
+        if (signal.aborted) throw error;
+        // Erreur réseau/quota/HTTP/réponse invalide sur ce miroir : on essaie le suivant plutôt
+        // que d'abandonner — c'est exactement le cas « Service saturé » observé en session.
+        lastError = error;
+      }
     }
-
-    if (response.status === 429 || response.status === 504) {
-      throw new GeoProviderError('rate-limited', `Le fournisseur limite les requêtes (HTTP ${response.status}).`);
-    }
-    if (!response.ok) {
-      throw new GeoProviderError('http', `Le fournisseur a répondu HTTP ${response.status}.`);
-    }
-
-    let body: unknown;
-    try {
-      body = await response.json();
-    } catch (error) {
-      throw new GeoProviderError('malformed-response', 'La réponse Overpass n\'est pas un JSON valide.', { cause: error });
-    }
-    return parseOverpassResponse(body);
+    throw lastError ?? new GeoProviderError('network', 'Aucun fournisseur de cartes disponible.');
   }
 }

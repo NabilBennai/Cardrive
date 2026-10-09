@@ -7,6 +7,7 @@ import { LocationPicker } from './LocationPicker';
 import { GeoLoadingScreen, type GeoLoadingScreenState } from './GeoLoadingScreen';
 import { GeoLoadError, loadRoadWorld, type LoadedRoadWorld } from './geoOrchestrator';
 import type { DrivingWorld } from './DrivingScene';
+import { Minimap } from '../ui/Minimap';
 
 const DrivingScene = lazy(() => import('./DrivingScene').then(({ DrivingScene: scene }) => ({ default: scene })));
 
@@ -42,6 +43,8 @@ const idleTelemetry: VehicleTelemetry = {
   brake: 0,
   steering: 0,
   tireTemperaturesC: [20, 20, 20, 20],
+  positionM: { xM: 0, zM: 0 },
+  headingRad: 0,
 };
 
 export function App() {
@@ -200,6 +203,13 @@ export function App() {
       )}
 
       {playing && <DrivingHUD telemetry={telemetry} paused={paused || tabHidden} onPause={pauseGame} onRespawn={respawn} />}
+
+      {playing && !useDemoTrack && lastPlace && (
+        <div className="minimap-panel">
+          <Minimap anchor={lastPlace} positionM={telemetry.positionM} headingRad={telemetry.headingRad} />
+          <p className="minimap-attribution">© OpenStreetMap contributors</p>
+        </div>
+      )}
 
       {playing && !useDemoTrack && (
         <p className="osm-attribution">© contributeurs OpenStreetMap · données via Overpass API</p>

@@ -357,6 +357,8 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
     telemetryRef.current = {
       speedMps: 0, engineRpm: genericVehicle.idleRpm, gear: 1, slip: 0, groundedWheels: 0, throttle: 0, brake: 0, steering: 0,
       tireTemperaturesC: wheelPosesRef.current.map((wheel) => wheel.temperatureC),
+      positionM: { xM: spawnPosition.x, zM: spawnPosition.z },
+      headingRad: 0,
     };
   }, [bodyRef, telemetryRef, spawnPosition, spawnPose?.rotation]);
 

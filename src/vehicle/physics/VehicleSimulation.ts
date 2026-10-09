@@ -216,6 +216,8 @@ export class VehicleSimulation {
     return { speedMps, engineRpm: this.rpm, gear: this.gear,
       slip: groundedWheels ? slip / groundedWheels : 0, groundedWheels,
       throttle: driveAllowed ? driveInput : 0, brake: brakeInput, steering: this.steeringRad / c.maxSteeringRad,
-      tireTemperaturesC: this.wheelPoses.map((pose) => pose.temperatureC) };
+      tireTemperaturesC: this.wheelPoses.map((pose) => pose.temperatureC),
+      positionM: { xM: this.position.x, zM: this.position.z },
+      headingRad: Math.atan2(this.forward.x, this.forward.z) };
   }
 }
