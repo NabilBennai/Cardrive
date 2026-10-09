@@ -2,6 +2,7 @@ import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, use
 import type { RapierRigidBody } from '@react-three/rapier';
 import { useDrivingInput } from '../input/useDrivingInput';
 import { useTouchDrivingInput } from '../input/useTouchDrivingInput';
+import type { GeoAnchor } from '../geo/projection';
 import type { GeoPoint, VehicleTelemetry } from '../shared/types';
 import { DrivingHUD } from '../ui/DrivingHUD';
 import { TouchControls } from '../ui/TouchControls';
@@ -73,6 +74,11 @@ export function App() {
   const [roadWorld, setRoadWorld] = useState<LoadedRoadWorld | null>(null);
   const [geoScreen, setGeoScreen] = useState<GeoLoadingScreenState | null>(null);
   const [lastPlace, setLastPlace] = useState<GeoPoint | null>(null);
+  // Étape 4 : ancre de rendu courante, remontée depuis DrivingScene à chaque recentrage
+  // d'origine flottante — la mini-carte doit s'en servir, pas lastPlace (qui reste l'ancre
+  // MONDE immuable et dérive de la position réelle après le premier recentrage).
+  const [renderAnchor, setRenderAnchor] = useState<GeoAnchor | null>(null);
+  const [zoneUnavailable, setZoneUnavailable] = useState(false);
   const geoAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => geoAbortRef.current?.abort(), []);
@@ -82,6 +88,8 @@ export function App() {
     const controller = new AbortController();
     geoAbortRef.current = controller;
     setLastPlace(place);
+    setRenderAnchor(null);
+    setZoneUnavailable(false);
     setGeoScreen({ kind: 'loading' });
     loadRoadWorld(place, controller.signal).then((world) => {
       if (controller.signal.aborted) return;
@@ -102,6 +110,8 @@ export function App() {
   const startDemoTrack = useCallback(() => {
     geoAbortRef.current?.abort();
     setUseDemoTrack(true);
+    setRenderAnchor(null);
+    setZoneUnavailable(false);
     setGeoScreen(null);
     setShowLocationPicker(false);
     setPlaying(true);
@@ -131,7 +141,7 @@ export function App() {
   const physicsPaused = useMemo(() => !playing || paused || tabHidden, [playing, paused, tabHidden]);
   const drivingWorld: DrivingWorld = useMemo(
     () => (!useDemoTrack && roadWorld
-      ? { kind: 'roads', graph: roadWorld.graph, buildingGraph: roadWorld.buildingGraph, spawnPose: roadWorld.spawnPose }
+      ? { kind: 'roads', worldAnchor: roadWorld.worldAnchor, initialChunks: roadWorld.initialChunks, spawnPose: roadWorld.spawnPose }
       : { kind: 'demo' }),
     [useDemoTrack, roadWorld],
   );
@@ -149,7 +159,17 @@ export function App() {
       {playing && (
         <SceneErrorBoundary key={sceneAttempt} onRetry={() => setSceneAttempt((value) => value + 1)}>
           <Suspense fallback={<div className="scene-loading"><i /> INITIALISATION DE LA PISTE</div>}>
-            <DrivingScene bodyRef={vehicleBody} input={input} telemetryRef={telemetryRef} paused={physicsPaused} respawnVersion={respawnVersion} onTelemetry={onTelemetry} world={drivingWorld} />
+            <DrivingScene
+              bodyRef={vehicleBody}
+              input={input}
+              telemetryRef={telemetryRef}
+              paused={physicsPaused}
+              respawnVersion={respawnVersion}
+              onTelemetry={onTelemetry}
+              world={drivingWorld}
+              onRenderAnchorChange={setRenderAnchor}
+              onZoneUnavailable={setZoneUnavailable}
+            />
           </Suspense>
         </SceneErrorBoundary>
       )}
@@ -208,15 +228,15 @@ export function App() {
         </section>
       )}
 
-      {playing && <DrivingHUD telemetry={telemetry} paused={paused || tabHidden} onPause={pauseGame} onRespawn={respawn} />}
+      {playing && <DrivingHUD telemetry={telemetry} paused={paused || tabHidden} onPause={pauseGame} onRespawn={respawn} zoneUnavailable={!useDemoTrack && zoneUnavailable} />}
 
       {playing && isTouchDevice && !(paused || tabHidden) && (
         <TouchControls setStick={touchInput.setStick} setHandbrake={touchInput.setHandbrake} />
       )}
 
-      {playing && !useDemoTrack && lastPlace && (
+      {playing && !useDemoTrack && (renderAnchor ?? lastPlace) && (
         <div className="minimap-panel">
-          <Minimap anchor={lastPlace} positionM={telemetry.positionM} headingRad={telemetry.headingRad} />
+          <Minimap anchor={(renderAnchor ?? lastPlace)!} positionM={telemetry.positionM} headingRad={telemetry.headingRad} />
           <p className="minimap-attribution">© OpenStreetMap contributors</p>
         </div>
       )}

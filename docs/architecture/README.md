@@ -1,6 +1,6 @@
 # Cardrive — Dossier d’architecture
 
-Statut : architecture cible ; étapes 1 et 2 livrées (validation de conduite dans le navigateur restante). Étape 3 (GPS, fournisseur Overpass, routes réelles) implémentée, avec premières vérifications manuelles réelles effectuées (un bug de requête Overpass trouvé et corrigé en usage réel). Une partie de l'étape 5 (bâtiments extrudés et textures procédurales sur les zones OSM) et un contrôle tactile de l'étape 7 ont été anticipés hors ordre. Étapes 4, 6 et le reste de l'étape 7 non commencés.
+Statut : architecture cible ; étapes 1 et 2 livrées (validation de conduite dans le navigateur restante). Étape 3 (GPS, fournisseur Overpass, routes réelles) implémentée, avec premières vérifications manuelles réelles effectuées (un bug de requête Overpass trouvé et corrigé en usage réel). Étape 4 (streaming de chunks, origine flottante activée) implémentée et testée hors navigateur (typecheck/lint/tests/build/script de simulation), jamais vérifiée en conduite réelle — un bref scintillement visuel au recentrage reste possible et non vérifié (voir src/world/streaming/useFloatingOrigin.ts). Une partie de l'étape 5 (bâtiments extrudés et textures procédurales sur les zones OSM) et un contrôle tactile de l'étape 7 ont été anticipés hors ordre. Étape 6 et le reste de l'étape 7 non commencés.
 Langue de l’interface initiale : français.
 Déploiement cible : application statique sur Vercel, sans backend applicatif.
 

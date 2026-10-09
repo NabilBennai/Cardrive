@@ -3,11 +3,11 @@ import { type GeoAnchor, projectToLocal, unprojectFromLocal } from './projection
 
 /**
  * Doc §6 : « Prévoir une origine flottante dès les interfaces, l'activer avec le streaming »,
- * avec un « seuil initial d'environ 1 km ». Ces fonctions sont écrites et testées mais NE SONT
- * PAS branchées dans une boucle de rendu/physique à l'étape 3 : la zone chargée est volontairement
- * petite (rayon ~400 m, voir src/map/predefinedPlaces.ts), donc ce seuil n'est jamais atteint tant
- * que le streaming de chunks (étape 4) n'existe pas. Aucun autre module n'importe ce fichier
- * aujourd'hui, seuls ses tests.
+ * avec un « seuil initial d'environ 1 km ». Activée à l'étape 4 (streaming de chunks) : voir
+ * src/world/streaming/useFloatingOrigin.ts, qui appelle ces fonctions depuis le pas physique
+ * (via GenericCar.onAfterPhysicsStep / useVehiclePhysics.onAfterStep) et répercute le décalage
+ * sur le châssis (translateVehicleBody), les groupes de chunks (offset recalculé, jamais la
+ * géométrie) et la caméra (snap instantané, voir ChaseCamera.tsx / DrivingScene.tsx).
  */
 export const RECENTER_THRESHOLD_M = 1_000;
 

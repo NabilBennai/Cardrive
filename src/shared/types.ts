@@ -39,21 +39,9 @@ export interface LocalPoint {
 
 export type SurfaceMaterial = 'asphalt' | 'concrete' | 'gravel' | 'grass';
 
-export interface RoadSegment {
-  id: string;
-  points: GeoPoint[];
-  widthM: number;
-  surface: SurfaceMaterial;
-}
-
 export interface ChunkKey {
   x: number;
   z: number;
-}
-
-export interface ChunkData {
-  key: ChunkKey;
-  roads: RoadSegment[];
 }
 
 export interface WheelMountConfig {

@@ -32,3 +32,14 @@ export function resetVehicleBody(body: RapierRigidBody, position = VEHICLE_SPAWN
   body.resetForces(true);
   body.resetTorques(true);
 }
+
+/**
+ * Décalage d'origine flottante (doc §6 : « Le décalage ne modifie pas la vitesse et ne doit
+ * pas apparaître comme un déplacement physique »). Contrairement à resetVehicleBody, ne touche
+ * ni aux vitesses ni aux forces/couples : seule la position change, le mouvement continue
+ * physiquement à l'identique dans le nouveau repère.
+ */
+export function translateVehicleBody(body: RapierRigidBody, offset: { xM: number; yM: number; zM: number }) {
+  const current = body.translation();
+  body.setTranslation({ x: current.x - offset.xM, y: current.y - offset.yM, z: current.z - offset.zM }, true);
+}

@@ -58,6 +58,7 @@ button:focus-visible { outline: 2px solid #d4ed55; outline-offset: 4px; }
 .minimap-panel { position: absolute; left: clamp(20px, 4vw, 60px); bottom: 26px; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .minimap-canvas { width: 150px; height: 150px; border: 1px solid rgba(236, 239, 223, .3); background: #182420; box-shadow: 0 8px 28px rgba(0, 0, 0, .4); }
 .minimap-attribution { margin: 0; color: rgba(239, 240, 231, .4); font-size: 6px; letter-spacing: .06em; }
+.zone-unavailable-notice { position: absolute; top: 76px; left: 50%; z-index: 3; transform: translateX(-50%); margin: 0; padding: 7px 14px; border: 1px solid rgba(228, 102, 67, .4); background: rgba(228, 102, 67, .14); color: #f0d6cd; font-size: 8px; letter-spacing: .08em; pointer-events: none; }
 
 .hud-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; background: linear-gradient(180deg, rgba(7, 12, 11, .56), transparent 23%, transparent 74%, rgba(7, 12, 11, .34)); }
 .hud-topbar { position: absolute; top: 0; left: 0; right: 0; height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 4vw, 60px); border-bottom: 1px solid rgba(242, 244, 230, .12); background: rgba(10, 16, 15, .47); }

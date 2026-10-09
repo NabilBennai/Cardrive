@@ -1,12 +1,14 @@
 import type { GeoAnchor } from '../geo/projection.ts';
 import { GeoProviderError, type GeoProviderErrorKind, type RawOsmData } from '../map/geoProvider.ts';
 import { openGeoCache, readGeoCache, writeGeoCache } from '../map/geoCache.ts';
-import { boundsAroundPoint } from '../map/geoBounds.ts';
 import { OverpassProvider } from '../map/overpassProvider.ts';
-import { buildRoadGraph, EmptyRoadZoneError, type RoadGraph } from '../world/roads/roadGraph.ts';
 import { pickSpawnPose, type RoadSpawnPose } from '../world/roads/spawnPlacement.ts';
-import { buildBuildingGraph, type BuildingGraph } from '../world/buildings/buildingGraph.ts';
-import type { GeoPoint } from '../shared/types.ts';
+import { buildStreamedChunk, splitRawByChunk, type StreamedChunk } from '../world/streaming/chunkOwnership.ts';
+import {
+  CHUNK_FETCH_MARGIN_M, chunkBoundsGeo, chunkKeyToString, chunkRenderOffset,
+  neighborhood, PHYSICS_RADIUS_CHUNKS, unionBoundsGeo,
+} from '../world/streaming/chunkGrid.ts';
+import type { ChunkKey, GeoPoint, LocalPoint } from '../shared/types.ts';
 
 export type GeoLoadErrorKind = GeoProviderErrorKind | 'empty-result';
 
@@ -18,65 +20,91 @@ export class GeoLoadError extends Error {
 }
 
 export interface LoadedRoadWorld {
-  graph: RoadGraph;
-  buildingGraph: BuildingGraph;
+  worldAnchor: GeoAnchor;
+  initialChunks: StreamedChunk[];
   spawnPose: RoadSpawnPose;
   providerId: string;
 }
 
 const EMPTY_RAW: RawOsmData = { nodes: [], ways: [] };
+/** Le lieu choisi EST l'ancre monde, donc son propre chunk a toujours la clé {0,0} (doc §6 : ancre immuable de la première zone). */
+const SPAWN_CHUNK_KEY: ChunkKey = { x: 0, z: 0 };
 
 /**
  * Seul point d'entrée qui instancie un fournisseur concret (doc §7 : « Aucun fournisseur
- * concret ne doit être importé par » les couches basses). Routes et bâtiments sont deux
- * requêtes/caches séparés (voir overpassProvider.ts : la requête combinée était trop lourde
- * pour les miroirs publics légers et produisait de faux « aucune route » sur des zones qui en
- * ont réellement). Les routes sont sur le chemin critique ; les bâtiments sont best-effort —
- * un échec de leur côté dégrade silencieusement vers zéro bâtiment plutôt que de bloquer le
- * chargement du lieu.
+ * concret ne doit être importé par » les couches basses). Charge le voisinage 3×3 (9 chunks)
+ * autour du lieu choisi — pas une grande zone unique comme à l'étape 3 — pour alimenter
+ * directement useChunkStreamer.ts au montage de la scène (pas de re-fetch redondant) : voir
+ * étape 4, streaming de chunks.
  */
 export async function loadRoadWorld(place: GeoPoint, signal: AbortSignal): Promise<LoadedRoadWorld> {
   const provider = new OverpassProvider();
-  const bounds = boundsAroundPoint(place);
-  const anchor: GeoAnchor = place;
+  const worldAnchor: GeoAnchor = place;
   const db = await openGeoCache().catch(() => null);
 
-  const roadsCacheKey = `${provider.id}-roads`;
-  let raw = db ? await readGeoCache(db, roadsCacheKey, bounds).catch(() => null) : null;
-  if (!raw) {
+  const spawnNeighborhood = neighborhood(SPAWN_CHUNK_KEY, PHYSICS_RADIUS_CHUNKS);
+  const initialChunks: StreamedChunk[] = [];
+  const stillMissing: ChunkKey[] = [];
+
+  for (const key of spawnNeighborhood) {
+    const bounds = chunkBoundsGeo(key, worldAnchor, CHUNK_FETCH_MARGIN_M);
+    const cachedRoads = db ? await readGeoCache(db, `${provider.id}-roads-chunk`, bounds).catch(() => null) : null;
+    const cachedBuildings = db ? await readGeoCache(db, `${provider.id}-buildings-chunk`, bounds).catch(() => null) : null;
+    if (cachedRoads && cachedBuildings) initialChunks.push(buildStreamedChunk(key, worldAnchor, cachedRoads, cachedBuildings));
+    else stillMissing.push(key);
+  }
+
+  if (stillMissing.length > 0) {
+    const bounds = unionBoundsGeo(stillMissing.map((key) => chunkBoundsGeo(key, worldAnchor, CHUNK_FETCH_MARGIN_M)));
+    let roadsRaw: RawOsmData;
     try {
-      raw = await provider.getRoads(bounds, signal);
+      roadsRaw = await provider.getRoads(bounds, signal);
     } catch (error) {
       if (error instanceof GeoProviderError) throw new GeoLoadError(error.kind, error.message);
       throw error;
     }
-    if (db) await writeGeoCache(db, roadsCacheKey, bounds, raw).catch(() => {});
-  }
+    // Best-effort (un bâtiment manquant ne doit jamais empêcher de charger le lieu).
+    const buildingsRaw = await provider.getBuildings(bounds, signal).catch(() => EMPTY_RAW);
 
-  let graph: RoadGraph;
-  try {
-    graph = buildRoadGraph(raw, anchor);
-  } catch (error) {
-    if (error instanceof EmptyRoadZoneError) throw new GeoLoadError('empty-result', error.message);
-    throw error;
-  }
-
-  const spawnPose = pickSpawnPose(graph);
-  if (!spawnPose) throw new GeoLoadError('empty-result', 'Aucun segment de route exploitable.');
-
-  const buildingsCacheKey = `${provider.id}-buildings`;
-  let buildingsRaw = db ? await readGeoCache(db, buildingsCacheKey, bounds).catch(() => null) : null;
-  if (!buildingsRaw) {
-    try {
-      buildingsRaw = await provider.getBuildings(bounds, signal);
-      if (db) await writeGeoCache(db, buildingsCacheKey, bounds, buildingsRaw).catch(() => {});
-    } catch {
-      // Best-effort : un bâtiment manquant ne doit jamais empêcher de rouler.
-      buildingsRaw = EMPTY_RAW;
+    const roadBuckets = splitRawByChunk(roadsRaw, worldAnchor, stillMissing);
+    const buildingBuckets = splitRawByChunk(buildingsRaw, worldAnchor, stillMissing);
+    for (const key of stillMissing) {
+      const keyStr = chunkKeyToString(key);
+      const roadRaw = roadBuckets.get(keyStr) ?? EMPTY_RAW;
+      const buildingRaw = buildingBuckets.get(keyStr) ?? EMPTY_RAW;
+      initialChunks.push(buildStreamedChunk(key, worldAnchor, roadRaw, buildingRaw));
+      if (db) {
+        const chunkBounds = chunkBoundsGeo(key, worldAnchor, CHUNK_FETCH_MARGIN_M);
+        writeGeoCache(db, `${provider.id}-roads-chunk`, chunkBounds, roadRaw).catch(() => {});
+        writeGeoCache(db, `${provider.id}-buildings-chunk`, chunkBounds, buildingRaw).catch(() => {});
+      }
     }
   }
-  // Jamais d'erreur ici non plus : zéro bâtiment dans la zone est un état normal.
-  const buildingGraph = buildBuildingGraph(buildingsRaw, anchor);
 
-  return { graph, buildingGraph, spawnPose, providerId: provider.id };
+  // Priorité au chunk du lieu choisi lui-même ; sinon le premier voisin qui a une route
+  // exploitable. Chaque chunk a sa PROPRE ancre locale (D2 — jamais de fusion de graphes
+  // d'ancres différentes, ce qui mélangerait des repères incompatibles) : la pose choisie dans
+  // le repère local du chunk est convertie vers le repère de rendu initial (renderAnchor ===
+  // worldAnchor au tout premier chargement, avant tout recentrage) via chunkRenderOffset.
+  const orderedChunks = [...initialChunks].sort((a, b) => {
+    const aIsSpawn = a.key.x === SPAWN_CHUNK_KEY.x && a.key.z === SPAWN_CHUNK_KEY.z;
+    const bIsSpawn = b.key.x === SPAWN_CHUNK_KEY.x && b.key.z === SPAWN_CHUNK_KEY.z;
+    return Number(bIsSpawn) - Number(aIsSpawn);
+  });
+  let spawnPose: RoadSpawnPose | null = null;
+  for (const chunk of orderedChunks) {
+    const localPose = pickSpawnPose(chunk.graph);
+    if (!localPose) continue;
+    const offset = chunkRenderOffset(chunk.key, worldAnchor, worldAnchor);
+    const position: LocalPoint = {
+      xM: offset.xM + localPose.position.xM,
+      yM: 0,
+      zM: offset.zM + localPose.position.zM,
+    };
+    spawnPose = { position, headingRad: localPose.headingRad };
+    break;
+  }
+  if (!spawnPose) throw new GeoLoadError('empty-result', 'Aucun segment de route exploitable.');
+
+  return { worldAnchor, initialChunks, spawnPose, providerId: provider.id };
 }

@@ -12,8 +12,11 @@ const STORE_NAME = 'zones';
  *  clés orphelines au lieu de faire croire silencieusement qu'une zone n'a aucun bâtiment.
  *  v3 : routes et bâtiments en deux requêtes/entrées de cache séparées (clé providerId
  *  suffixée -roads/-buildings) au lieu d'une requête combinée trop lourde pour les miroirs
- *  publics (observé : réponses vides/erreurs sur des zones qui ont pourtant des routes). */
-export const GENERATOR_VERSION = 3;
+ *  publics (observé : réponses vides/erreurs sur des zones qui ont pourtant des routes).
+ *  v4 : étape 4 (streaming) — les entrées sont désormais indexées par bbox de CHUNK (256 m,
+ *  suffixe -chunk) au lieu de bbox de zone entière (~800 m) ; les anciennes entrées v3
+ *  deviennent orphelines plutôt que d'être mal réutilisées pour un découpage différent. */
+export const GENERATOR_VERSION = 4;
 export const MAX_AGE_MS = 24 * 60 * 60 * 1_000;
 export const MAX_ENTRIES = 40;
 

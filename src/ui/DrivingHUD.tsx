@@ -5,6 +5,8 @@ interface DrivingHUDProps {
   paused: boolean;
   onPause: () => void;
   onRespawn: () => void;
+  /** Étape 4, doc §8 : « signaler la limite » quand un chunk voisin tarde à charger. Non bloquant — un sol de secours garantit qu'on ne tombe jamais. */
+  zoneUnavailable?: boolean;
 }
 
 const kmh = (speedMps: number) => Math.round(Math.abs(speedMps) * 3.6).toString().padStart(3, '0');
@@ -14,7 +16,7 @@ const TIRE_LABELS = ['AVG', 'AVD', 'ARG', 'ARD'];
 // cohérents avec le réglage physique (ambiant 20°C, optimal 85°C) sans y être couplés en dur.
 const tireStatus = (tempC: number) => (tempC < 55 ? 'cold' : tempC > 115 ? 'hot' : 'optimal');
 
-export function DrivingHUD({ telemetry, paused, onPause, onRespawn }: DrivingHUDProps) {
+export function DrivingHUD({ telemetry, paused, onPause, onRespawn, zoneUnavailable }: DrivingHUDProps) {
   const rpmProgress = Math.min(1, telemetry.engineRpm / 6700);
   const gripPercent = Math.min(100, Math.round(telemetry.slip * 100));
 
@@ -81,6 +83,8 @@ export function DrivingHUD({ telemetry, paused, onPause, onRespawn }: DrivingHUD
         <button className="text-button" onClick={onRespawn}><kbd>R</kbd> REPOSITIONNER</button>
         <button className="text-button" onClick={onPause}><kbd>ÉCHAP</kbd> PAUSE</button>
       </div>
+
+      {zoneUnavailable && <p className="zone-unavailable-notice">ZONE SUIVANTE INDISPONIBLE — NOUVELLE TENTATIVE EN COURS</p>}
     </div>
   );
 }

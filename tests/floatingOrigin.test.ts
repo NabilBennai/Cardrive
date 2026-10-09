@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { computeRecenterOffset, RECENTER_THRESHOLD_M, shouldRecenter } from '../src/geo/floatingOrigin';
 
-describe('floating origin (written and tested, not yet wired into any loop)', () => {
+// Activée à l'étape 4 : voir src/world/streaming/useFloatingOrigin.ts (appelé depuis
+// useBeforePhysicsStep via GenericCar.onAfterPhysicsStep / useVehiclePhysics.onAfterStep).
+describe('floating origin', () => {
   it('does not require recentering under the threshold', () => {
     expect(shouldRecenter({ xM: 500, yM: 0, zM: 500 })).toBe(false);
   });

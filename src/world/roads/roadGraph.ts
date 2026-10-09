@@ -37,11 +37,22 @@ export interface RoadGraph {
   excluded: ExcludedWay[];
 }
 
+/**
+ * Levée quand zéro voie carrossable n'est trouvée. Correct pour le chargement initial d'une
+ * zone (étape 3 : zone vide = erreur bloquante). Un chunk individuel (étape 4, streaming) doit
+ * au contraire INTERCEPTER cette erreur et la traiter comme un RoadGraph vide : un chunk sans
+ * route (parc, cours d'eau) est un état normal, pas une erreur — voir useChunkStreamer.ts.
+ */
 export class EmptyRoadZoneError extends Error {
   constructor() {
     super('Aucune voie carrossable dans cette zone.');
     this.name = 'EmptyRoadZoneError';
   }
+}
+
+/** Graphe vide, utilisé par les appelants par chunk pour remplacer un EmptyRoadZoneError intercepté. */
+export function emptyRoadGraph(): RoadGraph {
+  return { nodesById: new Map(), ways: [], junctionNodeIds: new Set(), excluded: [] };
 }
 
 /** width (mètres) > lanes × largeur de voie documentée > défaut documenté, doc §7 étape 4. */

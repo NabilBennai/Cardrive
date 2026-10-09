@@ -22,6 +22,8 @@ interface GenericCarProps {
   onTelemetry: (telemetry: VehicleTelemetry) => void;
   /** Absente par défaut (piste de démo) : position/rotation de VEHICLE_SPAWN inchangées. */
   spawnPose?: VehicleSpawnPose;
+  /** Origine flottante (étape 4) : voir useVehiclePhysics.ts. Absent par défaut, aucun changement pour la démo. */
+  onAfterPhysicsStep?: (telemetry: VehicleTelemetry, body: RapierRigidBody) => void;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
@@ -338,9 +340,9 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose }: GenericCarProps) {
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep }: GenericCarProps) {
   const wheelPosesRef = useRef(initialWheelPoses());
-  const physics = useVehiclePhysics({ bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry });
+  const physics = useVehiclePhysics({ bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep });
   const previousRespawnVersion = useRef(respawnVersion);
   const spawnPosition = spawnPose?.position ?? VEHICLE_SPAWN;
 
