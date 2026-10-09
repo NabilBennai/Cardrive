@@ -9,8 +9,13 @@ interface DrivingHUDProps {
 
 const kmh = (speedMps: number) => Math.round(Math.abs(speedMps) * 3.6).toString().padStart(3, '0');
 
+const TIRE_LABELS = ['AVG', 'AVD', 'ARG', 'ARD'];
+// Repères approximatifs d'une fenêtre de température pneu (froid / optimal / surchauffe) :
+// cohérents avec le réglage physique (ambiant 20°C, optimal 85°C) sans y être couplés en dur.
+const tireStatus = (tempC: number) => (tempC < 55 ? 'cold' : tempC > 115 ? 'hot' : 'optimal');
+
 export function DrivingHUD({ telemetry, paused, onPause, onRespawn }: DrivingHUDProps) {
-  const rpmProgress = Math.min(1, telemetry.engineRpm / 6400);
+  const rpmProgress = Math.min(1, telemetry.engineRpm / 6700);
   const gripPercent = Math.min(100, Math.round(telemetry.slip * 100));
 
   return (
@@ -51,6 +56,18 @@ export function DrivingHUD({ telemetry, paused, onPause, onRespawn }: DrivingHUD
         <div className="eyebrow"><span>GLISSEMENT</span><span>{gripPercent}%</span></div>
         <div className="grip-track"><span className={gripPercent > 65 ? 'warning' : ''} style={{ width: `${gripPercent}%` }} /></div>
         <div className="grip-caption">{gripPercent > 65 ? 'LIMITE D’ADHÉRENCE' : 'ADHÉRENCE STABLE'}</div>
+      </section>
+
+      <section className="tires-card" aria-label="Température des pneus">
+        <div className="eyebrow"><span>PNEUS</span><span>°C</span></div>
+        <div className="tires-grid">
+          {telemetry.tireTemperaturesC.map((tempC, index) => (
+            <div key={TIRE_LABELS[index]} className={`tire-cell ${tireStatus(tempC)}`}>
+              <span className="tire-label">{TIRE_LABELS[index]}</span>
+              <span className="tire-value">{Math.round(tempC)}</span>
+            </div>
+          ))}
+        </div>
       </section>
 
       <div className="controls-hint" aria-label="Commandes clavier">

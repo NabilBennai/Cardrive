@@ -14,6 +14,8 @@ export interface VehicleTelemetry {
   throttle: number;
   brake: number;
   steering: number;
+  /** Température de carcasse par roue, ordre wheelMounts (avant-gauche, avant-droit, arrière-gauche, arrière-droit). */
+  tireTemperaturesC: number[];
 }
 
 export interface VehicleSnapshot {
@@ -114,4 +116,11 @@ export interface VehicleConfig {
   minimumSuspensionLengthM: number;
   linearDamping: number;
   angularDamping: number;
+  ambientTemperatureC: number;
+  tireOptimalTemperatureC: number;
+  tireTemperatureFalloffC: number;
+  tireMinGripMultiplier: number;
+  tireThermalMassJPerC: number;
+  tireCoolingWPerC: number;
+  tireCoolingSpeedFactorPerMps: number;
 }

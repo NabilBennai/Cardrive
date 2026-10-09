@@ -9,6 +9,7 @@ export interface WheelPose {
   suspensionM: number;
   steeringRad: number;
   spinRad: number;
+  temperatureC: number;
 }
 
 const clamp = (value: number, lower: number, upper: number) => Math.max(lower, Math.min(upper, value));
@@ -45,7 +46,7 @@ export class VehicleSimulation {
     this.rpm = config.idleRpm;
     this.drivenWheelCount = config.wheelMounts.filter((wheel) => wheel.driven).length;
     this.wheelPoses = config.wheelMounts.map(({ xM, zM }) => ({
-      xM, zM, suspensionM: config.suspensionRestLengthM, steeringRad: 0, spinRad: 0,
+      xM, zM, suspensionM: config.suspensionRestLengthM, steeringRad: 0, spinRad: 0, temperatureC: config.ambientTemperatureC,
     }));
     this.impulses = config.wheelMounts.map(() => ({ impulse: new Vector3(), point: new Vector3() }));
   }
@@ -60,6 +61,7 @@ export class VehicleSimulation {
       pose.suspensionM = this.config.suspensionRestLengthM;
       pose.steeringRad = 0;
       pose.spinRad = 0;
+      pose.temperatureC = this.config.ambientTemperatureC;
     }
   }
 
@@ -134,6 +136,12 @@ export class VehicleSimulation {
       const pending = this.impulses[index];
       pending.impulse.set(0, 0, 0);
       pose.steeringRad = wheel.front ? -this.steeringRad : 0;
+      // Refroidissement par convection : s'applique même roue en l'air, renforcé par la vitesse (effet de l'air relatif).
+      const coolingW = c.tireCoolingWPerC * (1 + speedMps * c.tireCoolingSpeedFactorPerMps) * (pose.temperatureC - c.ambientTemperatureC);
+      pose.temperatureC -= (coolingW / c.tireThermalMassJPerC) * dt;
+      const temperatureDeltaC = pose.temperatureC - c.tireOptimalTemperatureC;
+      const temperatureGripFactor = Math.max(c.tireMinGripMultiplier,
+        1 - (temperatureDeltaC * temperatureDeltaC) / (c.tireTemperatureFalloffC * c.tireTemperatureFalloffC));
       this.mount.set(wheel.xM, -0.08, wheel.zM).applyQuaternion(this.rotation).add(this.position);
       this.ray.origin.x = this.mount.x;
       this.ray.origin.y = this.mount.y;
@@ -181,13 +189,22 @@ export class VehicleSimulation {
       // Never brake through zero within one step, including at parking speeds.
       const stoppingForce = -Math.sign(vLong) * Math.min(resistance, Math.abs(vLong) * wheelMass / dt);
       const longitudinal = (wheel.driven ? driveForce / this.drivenWheelCount : 0) + stoppingForce;
-      const grip = c.tireGrip * (!wheel.front ? 1 - handbrake * (1 - c.handbrakeRearGripFactor) : 1);
+      const grip = c.tireGrip * temperatureGripFactor * (!wheel.front ? 1 - handbrake * (1 - c.handbrakeRearGripFactor) : 1);
       const utilization = Math.hypot(lateral, longitudinal) / Math.max(1, load * grip);
       const scale = 1 / Math.max(1, utilization);
-      pending.impulse.addScaledVector(this.tireForward, longitudinal * scale * dt)
-        .addScaledVector(this.tireRight, lateral * scale * dt);
+      const appliedLateralN = lateral * scale;
+      const appliedLongitudinalN = longitudinal * scale;
+      pending.impulse.addScaledVector(this.tireForward, appliedLongitudinalN * dt)
+        .addScaledVector(this.tireRight, appliedLateralN * dt);
       pose.spinRad -= vLong * dt / c.wheelRadiusM;
       slip += Math.max(Math.abs(angle), Math.max(0, utilization - 1));
+      // Chaleur de glissement : dérive latérale (force x vitesse de glissement) plus
+      // dépassement du grip disponible (patinage/blocage), convertie par la masse thermique.
+      const slidingPowerW = Math.abs(appliedLateralN * vLat) + Math.max(0, utilization - 1) * load * grip * Math.max(Math.abs(vLong), 1);
+      pose.temperatureC += (slidingPowerW / c.tireThermalMassJPerC) * dt;
+      // Au-delà de ~180°C la gomme se dégrade réellement (cloques, fusion partielle) :
+      // ce plafond borne le modèle plutôt que de laisser la rétroaction thermique diverger.
+      pose.temperatureC = clamp(pose.temperatureC, -20, 180);
     }
     for (const pending of this.impulses) {
       if (pending.impulse.lengthSq() > 0) body.applyImpulseAtPoint(pending.impulse, pending.point, true);
@@ -198,6 +215,7 @@ export class VehicleSimulation {
     body.applyImpulse({ x: velocity.x * dragScale, y: 0, z: velocity.z * dragScale }, true);
     return { speedMps, engineRpm: this.rpm, gear: this.gear,
       slip: groundedWheels ? slip / groundedWheels : 0, groundedWheels,
-      throttle: driveAllowed ? driveInput : 0, brake: brakeInput, steering: this.steeringRad / c.maxSteeringRad };
+      throttle: driveAllowed ? driveInput : 0, brake: brakeInput, steering: this.steeringRad / c.maxSteeringRad,
+      tireTemperaturesC: this.wheelPoses.map((pose) => pose.temperatureC) };
   }
 }

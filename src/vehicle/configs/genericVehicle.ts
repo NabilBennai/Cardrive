@@ -38,6 +38,13 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
     config.lowSpeedTireDampingNsPerM,
     config.maximumSuspensionForceN,
     config.minimumSuspensionLengthM,
+    config.ambientTemperatureC,
+    config.tireOptimalTemperatureC,
+    config.tireTemperatureFalloffC,
+    config.tireMinGripMultiplier,
+    config.tireThermalMassJPerC,
+    config.tireCoolingWPerC,
+    config.tireCoolingSpeedFactorPerMps,
     ...config.gearRatios,
     ...config.torqueCurve.map((point) => point.rpm),
     ...config.torqueCurve.map((point) => point.torqueNm),
@@ -67,6 +74,7 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
   if (nonnegative.some((value) => !Number.isFinite(value) || value < 0)
     || !Number.isFinite(config.frontBrakeBias) || config.frontBrakeBias <= 0 || config.frontBrakeBias >= 1
     || !Number.isFinite(config.handbrakeRearGripFactor) || config.handbrakeRearGripFactor <= 0 || config.handbrakeRearGripFactor > 1
+    || !Number.isFinite(config.tireMinGripMultiplier) || config.tireMinGripMultiplier <= 0 || config.tireMinGripMultiplier > 1
     || config.drivetrainEfficiency > 1
     || config.downshiftRpm <= config.idleRpm || config.downshiftRpm >= config.upshiftRpm
     || config.upshiftRpm >= config.maximumRpm || config.launchRpm < config.idleRpm || config.launchRpm >= config.upshiftRpm
@@ -149,6 +157,17 @@ const genericVehicleDefinition: VehicleConfig = {
   minimumSuspensionLengthM: 0.11,
   linearDamping: 0.01,
   angularDamping: 0.5,
+  // Modèle thermique de pneu (nœud unique, carcasse) : la chaleur vient du travail de
+  // glissement (dérive latérale + dépassement du grip disponible), le refroidissement
+  // vient de la convection d'air, renforcée par la vitesse. Le grip suit une fenêtre de
+  // température optimale, pas un coefficient fixe : pneus froids ou surchauffés glissent.
+  ambientTemperatureC: 20,
+  tireOptimalTemperatureC: 85,
+  tireTemperatureFalloffC: 55,
+  tireMinGripMultiplier: 0.6,
+  tireThermalMassJPerC: 11_000,
+  tireCoolingWPerC: 3,
+  tireCoolingSpeedFactorPerMps: 0.12,
 };
 
 export const genericVehicle = validateVehicleConfig(genericVehicleDefinition);

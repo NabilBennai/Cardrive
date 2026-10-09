@@ -30,13 +30,14 @@ class SceneErrorBoundary extends Component<{ children: ReactNode; onRetry: () =>
 
 const idleTelemetry: VehicleTelemetry = {
   speedMps: 0,
-  engineRpm: 850,
+  engineRpm: 900,
   gear: 1,
   slip: 0,
   groundedWheels: 0,
   throttle: 0,
   brake: 0,
   steering: 0,
+  tireTemperaturesC: [20, 20, 20, 20],
 };
 
 export function App() {

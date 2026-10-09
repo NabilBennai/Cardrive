@@ -105,6 +105,7 @@ const initialWheelPoses = (): WheelPose[] => genericVehicle.wheelMounts.map(({ x
   suspensionM: WHEEL_REST_SUSPENSION_M,
   steeringRad: 0,
   spinRad: 0,
+  temperatureC: genericVehicle.ambientTemperatureC,
 }));
 
 /** Roue à jante aluminium 5 branches : pneu, disque de frein, jante, branches et écrous. */
@@ -343,8 +344,12 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
       wheel.suspensionM = WHEEL_REST_SUSPENSION_M;
       wheel.spinRad = 0;
       wheel.steeringRad = 0;
+      wheel.temperatureC = genericVehicle.ambientTemperatureC;
     });
-    telemetryRef.current = { speedMps: 0, engineRpm: genericVehicle.idleRpm, gear: 1, slip: 0, groundedWheels: 0, throttle: 0, brake: 0, steering: 0 };
+    telemetryRef.current = {
+      speedMps: 0, engineRpm: genericVehicle.idleRpm, gear: 1, slip: 0, groundedWheels: 0, throttle: 0, brake: 0, steering: 0,
+      tireTemperaturesC: wheelPosesRef.current.map((wheel) => wheel.temperatureC),
+    };
   }, [bodyRef, telemetryRef]);
 
   useLayoutEffect(() => {

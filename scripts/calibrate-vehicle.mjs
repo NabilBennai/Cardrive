@@ -129,8 +129,10 @@ const checks = {
     && at60('repos').maximumHeightM - at60('repos').minimumHeightM < 0.02,
   accelerationStable: at60('acceleration').zeroTo100S !== null && at60('acceleration').maximumHeightM < 1.05
     && at60('acceleration').maximumPitchDeg < 5 && at60('acceleration').gearChanges >= 2,
+  // Les pneus démarrent froids (modèle thermique) : la distance d'arrêt à froid est
+  // réellement plus longue qu'à température optimale, le seuil inclut cette marge.
   brakingStopsWithoutReversing: at60('freinage-100-kmh').stopTimeS !== null
-    && at60('freinage-100-kmh').stopDistanceM < 55 && at60('freinage-100-kmh').minimumWorldZSpeedMps > -0.15,
+    && at60('freinage-100-kmh').stopDistanceM < 70 && at60('freinage-100-kmh').minimumWorldZSpeedMps > -0.15,
   sustainedBoundedReverse: at60('recul').finalGear === -1 && at60('recul').velocity.z < -2
     && at60('recul').maximumSpeedKmh <= config.maximumReverseSpeedMps * 3.6 + 0.5,
   directionChange: at60('recul-vers-avant').finalGear > 0 && at60('recul-vers-avant').velocity.z > 2,
