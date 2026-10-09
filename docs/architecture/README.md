@@ -1,6 +1,6 @@
 # Cardrive — Dossier d’architecture
 
-Statut : architecture cible ; étape 1 implémentée et calibration numérique de l’étape 2 livrée, validation de conduite dans le navigateur restante.
+Statut : architecture cible ; étapes 1 et 2 livrées (validation de conduite dans le navigateur restante), étape 3 (GPS, fournisseur Overpass, routes réelles) implémentée et testée hors navigateur, vérification manuelle en conditions réseau réelles restante.
 Langue de l’interface initiale : français.
 Déploiement cible : application statique sur Vercel, sans backend applicatif.
 

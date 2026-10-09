@@ -44,6 +44,16 @@ button:focus-visible { outline: 2px solid #d4ed55; outline-offset: 4px; }
 .start-note span { padding: 0 7px; color: #d4ed55; }
 .start-coordinate { position: absolute; right: clamp(24px, 5vw, 76px); bottom: 76px; color: rgba(237, 241, 226, .72); font-size: 11px; line-height: 1.8; letter-spacing: .08em; text-align: right; }
 .start-coordinate small { color: rgba(237, 241, 226, .4); font-size: 8px; letter-spacing: .16em; }
+.location-launch { pointer-events: auto; display: block; margin-top: 14px; color: rgba(212, 237, 85, .85); }
+.location-list { display: flex; flex-direction: column; gap: 8px; margin: 22px 0 18px; }
+.location-option { pointer-events: auto; padding: 11px 14px; border: 1px solid rgba(236, 239, 223, .22); background: rgba(16, 25, 24, .4); color: #eff0e7; text-align: left; cursor: pointer; font-size: 10px; letter-spacing: .04em; transition: border-color .2s ease, color .2s ease; }
+.location-option:hover { border-color: #d4ed55; color: #d4ed55; }
+.location-manual { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 20px; }
+.location-manual label { display: flex; flex-direction: column; gap: 6px; color: rgba(239, 240, 231, .5); font-size: 8px; letter-spacing: .12em; }
+.location-manual input { width: 130px; padding: 9px 10px; border: 1px solid rgba(236, 239, 223, .25); background: rgba(16, 25, 24, .5); color: #eff0e7; font: inherit; font-size: 11px; pointer-events: auto; }
+.location-manual input:focus-visible { outline: 2px solid #d4ed55; outline-offset: 2px; }
+.location-footer { display: flex; gap: 20px; }
+.osm-attribution { position: absolute; bottom: 8px; left: 50%; z-index: 3; transform: translateX(-50%); color: rgba(239, 240, 231, .45); font-size: 7px; letter-spacing: .08em; pointer-events: none; }
 
 .hud-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; background: linear-gradient(180deg, rgba(7, 12, 11, .56), transparent 23%, transparent 74%, rgba(7, 12, 11, .34)); }
 .hud-topbar { position: absolute; top: 0; left: 0; right: 0; height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 4vw, 60px); border-bottom: 1px solid rgba(242, 244, 230, .12); background: rgba(10, 16, 15, .47); }

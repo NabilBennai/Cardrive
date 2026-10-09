@@ -1,8 +1,12 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { RapierRigidBody } from '@react-three/rapier';
 import { useDrivingInput } from '../input/useDrivingInput';
-import type { VehicleTelemetry } from '../shared/types';
+import type { GeoPoint, VehicleTelemetry } from '../shared/types';
 import { DrivingHUD } from '../ui/DrivingHUD';
+import { LocationPicker } from './LocationPicker';
+import { GeoLoadingScreen, type GeoLoadingScreenState } from './GeoLoadingScreen';
+import { GeoLoadError, loadRoadWorld, type LoadedRoadWorld } from './geoOrchestrator';
+import type { DrivingWorld } from './DrivingScene';
 
 const DrivingScene = lazy(() => import('./DrivingScene').then(({ DrivingScene: scene }) => ({ default: scene })));
 
@@ -53,6 +57,48 @@ export function App() {
   const pauseGame = useCallback(() => setPaused((value) => !value), []);
   const respawn = useCallback(() => setRespawnVersion((value) => value + 1), []);
   const input = useDrivingInput(playing, paused || tabHidden, gameFocus, pauseGame, respawn);
+
+  // Étape 3 : choix du lieu, chargement OSM/Overpass, piste de démo toujours disponible hors ligne.
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [useDemoTrack, setUseDemoTrack] = useState(true);
+  const [roadWorld, setRoadWorld] = useState<LoadedRoadWorld | null>(null);
+  const [geoScreen, setGeoScreen] = useState<GeoLoadingScreenState | null>(null);
+  const [lastPlace, setLastPlace] = useState<GeoPoint | null>(null);
+  const geoAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => geoAbortRef.current?.abort(), []);
+
+  const requestRoadWorld = useCallback((place: GeoPoint) => {
+    geoAbortRef.current?.abort();
+    const controller = new AbortController();
+    geoAbortRef.current = controller;
+    setLastPlace(place);
+    setGeoScreen({ kind: 'loading' });
+    loadRoadWorld(place, controller.signal).then((world) => {
+      if (controller.signal.aborted) return;
+      setRoadWorld(world);
+      setUseDemoTrack(false);
+      setGeoScreen(null);
+      setShowLocationPicker(false);
+      setPlaying(true);
+      setPaused(false);
+      requestAnimationFrame(() => gameFocus.current?.focus());
+    }).catch((error) => {
+      if (controller.signal.aborted) return;
+      const kind = error instanceof GeoLoadError ? error.kind : 'network';
+      setGeoScreen({ kind: 'error', errorKind: kind });
+    });
+  }, []);
+
+  const startDemoTrack = useCallback(() => {
+    geoAbortRef.current?.abort();
+    setUseDemoTrack(true);
+    setGeoScreen(null);
+    setShowLocationPicker(false);
+    setPlaying(true);
+    setPaused(false);
+    requestAnimationFrame(() => gameFocus.current?.focus());
+  }, []);
   const onTelemetry = useCallback((next: VehicleTelemetry) => {
     telemetryRef.current = next;
     setTelemetry(next);
@@ -74,6 +120,10 @@ export function App() {
   }, []);
 
   const physicsPaused = useMemo(() => !playing || paused || tabHidden, [playing, paused, tabHidden]);
+  const drivingWorld: DrivingWorld = useMemo(
+    () => (!useDemoTrack && roadWorld ? { kind: 'roads', graph: roadWorld.graph, spawnPose: roadWorld.spawnPose } : { kind: 'demo' }),
+    [useDemoTrack, roadWorld],
+  );
 
   return (
     <main
@@ -88,12 +138,28 @@ export function App() {
       {playing && (
         <SceneErrorBoundary key={sceneAttempt} onRetry={() => setSceneAttempt((value) => value + 1)}>
           <Suspense fallback={<div className="scene-loading"><i /> INITIALISATION DE LA PISTE</div>}>
-            <DrivingScene bodyRef={vehicleBody} input={input} telemetryRef={telemetryRef} paused={physicsPaused} respawnVersion={respawnVersion} onTelemetry={onTelemetry} />
+            <DrivingScene bodyRef={vehicleBody} input={input} telemetryRef={telemetryRef} paused={physicsPaused} respawnVersion={respawnVersion} onTelemetry={onTelemetry} world={drivingWorld} />
           </Suspense>
         </SceneErrorBoundary>
       )}
 
-      {!playing && (
+      {!playing && showLocationPicker && !geoScreen && (
+        <LocationPicker
+          onChoosePlace={requestRoadWorld}
+          onUseDemoTrack={startDemoTrack}
+          onBack={() => setShowLocationPicker(false)}
+        />
+      )}
+
+      {!playing && geoScreen && (
+        <GeoLoadingScreen
+          state={geoScreen}
+          onRetry={() => lastPlace && requestRoadWorld(lastPlace)}
+          onUseDemoTrack={startDemoTrack}
+        />
+      )}
+
+      {!playing && !showLocationPicker && !geoScreen && (
         <section className="start-screen">
           <svg className="start-route" viewBox="0 0 680 460" fill="none" aria-hidden="true">
             <defs>
@@ -123,6 +189,7 @@ export function App() {
             <h1>La route<br /><em>vous attend.</em></h1>
             <p className="intro-copy">Prenez le volant du prototype R-01.<br />Une piste, quatre roues, et la physique pour seule limite.</p>
             <button className="start-button" onClick={startGame}><span>PRENDRE LE VOLANT</span><b>↗</b></button>
+            <button className="text-button location-launch" onClick={() => setShowLocationPicker(true)}>CHOISIR UN LIEU RÉEL (BÊTA)</button>
             <p className="start-note">CLAVIER · ZQSD / WASD <span>•</span> DÉMO HORS LIGNE</p>
           </div>
           <div className="start-bottom"><span>01 — 04 ROUE MOTRICE ARRIÈRE</span><span>CONSTRUIT POUR LA ROUTE</span></div>
@@ -131,6 +198,10 @@ export function App() {
       )}
 
       {playing && <DrivingHUD telemetry={telemetry} paused={paused || tabHidden} onPause={pauseGame} onRespawn={respawn} />}
+
+      {playing && !useDemoTrack && (
+        <p className="osm-attribution">© contributeurs OpenStreetMap · données via Overpass API</p>
+      )}
 
       {playing && (paused || tabHidden) && (
         <section className="pause-overlay" aria-label="Jeu en pause">

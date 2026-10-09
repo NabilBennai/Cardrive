@@ -9,12 +9,19 @@ import { resetVehicleBody, vehicleMassProperties, VEHICLE_COLLIDER_FRICTION, VEH
 
 const rigidBodyMassProperties = vehicleMassProperties(genericVehicle);
 
+export interface VehicleSpawnPose {
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number; w: number };
+}
+
 interface GenericCarProps {
   bodyRef: React.RefObject<RapierRigidBody | null>;
   input: React.RefObject<VehicleInput>;
   telemetryRef: React.RefObject<VehicleTelemetry>;
   respawnVersion: number;
   onTelemetry: (telemetry: VehicleTelemetry) => void;
+  /** Absente par défaut (piste de démo) : position/rotation de VEHICLE_SPAWN inchangées. */
+  spawnPose?: VehicleSpawnPose;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
@@ -331,15 +338,16 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry }: GenericCarProps) {
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose }: GenericCarProps) {
   const wheelPosesRef = useRef(initialWheelPoses());
   const physics = useVehiclePhysics({ bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry });
   const previousRespawnVersion = useRef(respawnVersion);
+  const spawnPosition = spawnPose?.position ?? VEHICLE_SPAWN;
 
   const respawn = useCallback(() => {
     const rigidBody = bodyRef.current;
     if (!rigidBody) return;
-    resetVehicleBody(rigidBody);
+    resetVehicleBody(rigidBody, spawnPosition, spawnPose?.rotation);
     wheelPosesRef.current.forEach((wheel) => {
       wheel.suspensionM = WHEEL_REST_SUSPENSION_M;
       wheel.spinRad = 0;
@@ -350,7 +358,7 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
       speedMps: 0, engineRpm: genericVehicle.idleRpm, gear: 1, slip: 0, groundedWheels: 0, throttle: 0, brake: 0, steering: 0,
       tireTemperaturesC: wheelPosesRef.current.map((wheel) => wheel.temperatureC),
     };
-  }, [bodyRef, telemetryRef]);
+  }, [bodyRef, telemetryRef, spawnPosition, spawnPose?.rotation]);
 
   useLayoutEffect(() => {
     if (previousRespawnVersion.current !== respawnVersion) {
@@ -364,7 +372,8 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
       ref={bodyRef}
       name="generic-car-chassis"
       colliders={false}
-      position={[VEHICLE_SPAWN.x, VEHICLE_SPAWN.y, VEHICLE_SPAWN.z]}
+      position={[spawnPosition.x, spawnPosition.y, spawnPosition.z]}
+      quaternion={spawnPose ? [spawnPose.rotation.x, spawnPose.rotation.y, spawnPose.rotation.z, spawnPose.rotation.w] : undefined}
       linearDamping={genericVehicle.linearDamping}
       angularDamping={genericVehicle.angularDamping}
       ccd

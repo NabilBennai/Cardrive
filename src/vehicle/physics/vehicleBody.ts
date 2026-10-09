@@ -16,9 +16,17 @@ export function vehicleMassProperties(config: VehicleConfig) {
   };
 }
 
-export function resetVehicleBody(body: RapierRigidBody, position = VEHICLE_SPAWN) {
+const IDENTITY_ROTATION = { x: 0, y: 0, z: 0, w: 1 };
+
+/** Quaternion de lacet pur autour de l'axe Y, pour orienter un spawn selon la tangente d'une route. */
+export function headingToQuaternion(headingRad: number) {
+  const half = headingRad / 2;
+  return { x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) };
+}
+
+export function resetVehicleBody(body: RapierRigidBody, position = VEHICLE_SPAWN, rotation = IDENTITY_ROTATION) {
   body.setTranslation(position, true);
-  body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+  body.setRotation(rotation, true);
   body.setLinvel({ x: 0, y: 0, z: 0 }, true);
   body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   body.resetForces(true);
