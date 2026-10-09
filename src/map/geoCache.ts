@@ -9,8 +9,11 @@ const STORE_NAME = 'zones';
  *  v2 : la requête Overpass demande désormais aussi les empreintes de bâtiments ; une entrée
  *  en cache v1 vient d'une requête qui ne les a jamais demandées (pas de données obsolètes
  *  mais valides à relire, il manque une vraie requête réseau) — bumper la version rend ces
- *  clés orphelines au lieu de faire croire silencieusement qu'une zone n'a aucun bâtiment. */
-export const GENERATOR_VERSION = 2;
+ *  clés orphelines au lieu de faire croire silencieusement qu'une zone n'a aucun bâtiment.
+ *  v3 : routes et bâtiments en deux requêtes/entrées de cache séparées (clé providerId
+ *  suffixée -roads/-buildings) au lieu d'une requête combinée trop lourde pour les miroirs
+ *  publics (observé : réponses vides/erreurs sur des zones qui ont pourtant des routes). */
+export const GENERATOR_VERSION = 3;
 export const MAX_AGE_MS = 24 * 60 * 60 * 1_000;
 export const MAX_ENTRIES = 40;
 

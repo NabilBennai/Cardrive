@@ -19,15 +19,23 @@ const DRIVABLE_HIGHWAY_VALUES = [
 ];
 
 /**
- * Requête Overpass QL : voies carrossables ET empreintes de bâtiments dans la zone, avec leurs
- * nœuds (doc §7, étape 1 du pipeline). Une seule requête groupée pour les deux : RawOsmData
- * reste un {nodes, ways} plat, et chaque consommateur (roadGraph.ts / buildingGraph.ts) filtre
- * par le tag qui le concerne (highway / building) sans se soucier de l'autre.
+ * Deux requêtes SÉPARÉES plutôt qu'une seule groupée (routes + bâtiments) : constaté en
+ * session que la requête combinée est trop lourde pour les miroirs publics légers — une
+ * instance répond 500, une autre renvoie un JSON valide mais vide (aucune erreur détectable),
+ * l'officielle expire en 504, alors que la MÊME zone interrogée pour les routes seules
+ * fonctionne normalement sur plusieurs miroirs. Séparer rend chaque requête plus légère et
+ * isole l'échec : un échec sur les bâtiments (optionnels, voir OverpassProvider.getBuildings)
+ * ne doit jamais empêcher de charger les routes (doc §7, critère central de l'étape 3).
  */
-export function buildOverpassQuery(bounds: GeoBounds): string {
+export function buildHighwayQuery(bounds: GeoBounds): string {
   const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
   const highwayPattern = `^(${DRIVABLE_HIGHWAY_VALUES.join('|')})$`;
-  return `[out:json][timeout:${OVERPASS_TIMEOUT_S}];(way["highway"~"${highwayPattern}"](${bbox});way["building"](${bbox}););out body;>;out skel qt;`;
+  return `[out:json][timeout:${OVERPASS_TIMEOUT_S}];(way["highway"~"${highwayPattern}"](${bbox}););out body;>;out skel qt;`;
+}
+
+export function buildBuildingQuery(bounds: GeoBounds): string {
+  const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
+  return `[out:json][timeout:${OVERPASS_TIMEOUT_S}];(way["building"](${bbox}););out body;>;out skel qt;`;
 }
 
 interface OverpassElement {
@@ -103,20 +111,37 @@ export class OverpassProvider implements GeoProvider {
 
   constructor(private readonly baseUrls: string[] = OVERPASS_URLS) {}
 
-  async getRoads(bounds: GeoBounds, signal: AbortSignal): Promise<RawOsmData> {
-    const query = buildOverpassQuery(bounds);
+  /**
+   * Essaie chaque miroir dans l'ordre. `isAcceptable` permet de ne PAS se satisfaire d'une
+   * réponse vide « suspecte » (cas observé : un miroir renvoie 0 élément sans erreur alors que
+   * la zone en contient réellement) et d'essayer le miroir suivant ; si tous les miroirs
+   * répondent mais sont tous vides, on accepte la dernière réponse vide (zone réellement vide,
+   * pas un échec réseau).
+   */
+  private async fetchWithFallback(query: string, signal: AbortSignal, isAcceptable: (result: RawOsmData) => boolean): Promise<RawOsmData> {
     let lastError: unknown;
+    let lastEmptyResult: RawOsmData | null = null;
     for (const baseUrl of this.baseUrls) {
       if (signal.aborted) throw lastError ?? new GeoProviderError('network', 'Requête annulée.');
       try {
-        return await fetchFrom(baseUrl, query, signal);
+        const result = await fetchFrom(baseUrl, query, signal);
+        if (isAcceptable(result)) return result;
+        lastEmptyResult = result;
       } catch (error) {
         if (signal.aborted) throw error;
-        // Erreur réseau/quota/HTTP/réponse invalide sur ce miroir : on essaie le suivant plutôt
-        // que d'abandonner — c'est exactement le cas « Service saturé » observé en session.
         lastError = error;
       }
     }
+    if (lastEmptyResult) return lastEmptyResult;
     throw lastError ?? new GeoProviderError('network', 'Aucun fournisseur de cartes disponible.');
+  }
+
+  async getRoads(bounds: GeoBounds, signal: AbortSignal): Promise<RawOsmData> {
+    return this.fetchWithFallback(buildHighwayQuery(bounds), signal, (result) => result.ways.length > 0);
+  }
+
+  /** Best-effort : zéro bâtiment est un résultat valide (pas de nouvelle tentative sur une réponse vide). */
+  async getBuildings(bounds: GeoBounds, signal: AbortSignal): Promise<RawOsmData> {
+    return this.fetchWithFallback(buildBuildingQuery(bounds), signal, () => true);
   }
 }
