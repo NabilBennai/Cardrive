@@ -20,7 +20,7 @@ interface GenericCarProps {
 const initialWheelPoses = (): WheelPose[] => genericVehicle.wheelMounts.map(({ xM, zM }) => ({
   xM,
   zM,
-  suspensionM: 0.47,
+  suspensionM: 0.41,
   steeringRad: 0,
   spinRad: 0,
 }));
@@ -42,7 +42,7 @@ function Wheel({ wheelPosesRef, wheelIndex, side }: { wheelPosesRef: React.RefOb
     <group ref={steeringGroup}>
       <group ref={spinGroup}>
         <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[genericVehicle.wheelRadiusM, genericVehicle.wheelRadiusM, 0.22, 24]} />
+          <cylinderGeometry args={[genericVehicle.wheelRadiusM, genericVehicle.wheelRadiusM, 0.19, 24]} />
           <meshStandardMaterial color="#171a19" roughness={0.82} />
         </mesh>
         <mesh position={[side * 0.116, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
@@ -68,7 +68,7 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
     if (!rigidBody) return;
     resetVehicleBody(rigidBody);
     wheelPosesRef.current.forEach((wheel) => {
-      wheel.suspensionM = 0.47;
+      wheel.suspensionM = 0.41;
       wheel.spinRad = 0;
       wheel.steeringRad = 0;
     });
@@ -100,37 +100,48 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
         restitution={VEHICLE_COLLIDER_RESTITUTION}
       />
       <group>
-        <mesh position={[0, 0.12, -0.04]} castShadow receiveShadow>
-          <boxGeometry args={[1.78, 0.48, 3.42]} />
+        {/* Soubassement : empattement et voie plus larges, silhouette de citadine haute (Citroën C3 phase 2). */}
+        <mesh position={[0, 0.16, -0.05]} castShadow receiveShadow>
+          <boxGeometry args={[1.6, 0.54, 3.7]} />
           <meshStandardMaterial color="#c9e63f" metalness={0.38} roughness={0.32} />
         </mesh>
-        <mesh position={[0, 0.4, -0.25]} castShadow>
-          <boxGeometry args={[1.38, 0.48, 1.48]} />
+        {/* Habitacle haut et carré : trait marquant d'une citadine à vocation pratique. */}
+        <mesh position={[0, 0.83, -0.27]} castShadow>
+          <boxGeometry args={[1.28, 0.8, 1.6]} />
           <meshStandardMaterial color="#252c2b" metalness={0.62} roughness={0.24} />
         </mesh>
-        <mesh position={[0, 0.62, -0.24]} castShadow>
-          <boxGeometry args={[1.19, 0.12, 1.18]} />
+        <mesh position={[0, 1.31, -0.26]} castShadow>
+          <boxGeometry args={[1.09, 0.16, 1.28]} />
           <meshStandardMaterial color="#111b20" metalness={0.24} roughness={0.18} />
         </mesh>
-        <mesh position={[0, 0.04, 1.05]} castShadow>
-          <boxGeometry args={[1.7, 0.16, 0.56]} />
+        {/* Capot court, face avant arrondie avec barre chromée entre les blocs optiques ronds. */}
+        <mesh position={[0, 0.08, 1.14]} castShadow>
+          <boxGeometry args={[1.56, 0.2, 0.61]} />
           <meshStandardMaterial color="#d7eb69" metalness={0.24} roughness={0.34} />
         </mesh>
-        <mesh position={[0, 0.37, 1.55]}>
-          <boxGeometry args={[0.62, 0.08, 0.04]} />
+        <mesh position={[0, 0.3, 1.68]}>
+          <boxGeometry args={[1.08, 0.05, 0.04]} />
+          <meshStandardMaterial color="#c6c9bb" metalness={0.85} roughness={0.2} />
+        </mesh>
+        <mesh position={[-0.58, 0.26, 1.68]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.17, 0.17, 0.05, 20]} />
           <meshBasicMaterial color="#fff0ce" />
         </mesh>
-        <mesh position={[-0.66, 0.36, 1.55]}>
-          <boxGeometry args={[0.38, 0.08, 0.04]} />
-          <meshBasicMaterial color="#d64f38" />
+        <mesh position={[0.58, 0.26, 1.68]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.17, 0.17, 0.05, 20]} />
+          <meshBasicMaterial color="#fff0ce" />
         </mesh>
-        <mesh position={[0.66, 0.36, 1.55]}>
-          <boxGeometry args={[0.38, 0.08, 0.04]} />
-          <meshBasicMaterial color="#d64f38" />
-        </mesh>
-        <mesh position={[0, 0.0, -1.62]} castShadow>
-          <boxGeometry args={[1.86, 0.1, 0.22]} />
+        <mesh position={[0, 0.04, -1.75]} castShadow>
+          <boxGeometry args={[1.7, 0.12, 0.24]} />
           <meshStandardMaterial color="#232927" roughness={0.58} />
+        </mesh>
+        <mesh position={[-0.62, 0.3, -1.84]}>
+          <boxGeometry args={[0.32, 0.1, 0.04]} />
+          <meshBasicMaterial color="#d64f38" />
+        </mesh>
+        <mesh position={[0.62, 0.3, -1.84]}>
+          <boxGeometry args={[0.32, 0.1, 0.04]} />
+          <meshBasicMaterial color="#d64f38" />
         </mesh>
         {physics.wheelMounts.map((wheel, index) => (
           <Wheel key={index} wheelPosesRef={wheelPosesRef} wheelIndex={index} side={wheel.xM < 0 ? -1 : 1} />

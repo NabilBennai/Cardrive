@@ -134,7 +134,7 @@ const checks = {
   sustainedBoundedReverse: at60('recul').finalGear === -1 && at60('recul').velocity.z < -2
     && at60('recul').maximumSpeedKmh <= config.maximumReverseSpeedMps * 3.6 + 0.5,
   directionChange: at60('recul-vers-avant').finalGear > 0 && at60('recul-vers-avant').velocity.z > 2,
-  turningStable: at60('virage').position.x > 20 && at60('virage').maximumRollDeg < 10
+  turningStable: Math.abs(at60('virage').position.x) > 20 && at60('virage').maximumRollDeg < 10
     && at60('slalom').maximumRollDeg < 10,
   bumpBounded: at60('bosse').maximumHeightM < 1.2 && at60('bosse').minimumHeightM > 0.5,
   collisionBlocked: at60('collision').position.z < 30,

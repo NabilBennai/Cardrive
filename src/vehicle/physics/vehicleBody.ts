@@ -2,7 +2,7 @@
 import type { VehicleConfig } from '../../shared/types.ts';
 
 export const VEHICLE_FIXED_STEP_S = 1 / 60;
-export const VEHICLE_SPAWN = { x: 38, y: 0.9, z: 0 };
+export const VEHICLE_SPAWN = { x: 38, y: 0.8, z: 0 };
 export const VEHICLE_COLLIDER_FRICTION = 0.72;
 export const VEHICLE_COLLIDER_RESTITUTION = 0.08;
 
