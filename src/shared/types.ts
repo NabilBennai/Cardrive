@@ -105,7 +105,6 @@ export interface VehicleConfig {
   directionChangeDelayS: number;
   maximumReverseSpeedMps: number;
   steeringRateRadPerS: number;
-  maximumCorneringAccelerationMps2: number;
   tireCorneringStiffnessPerRad: number;
   lowSpeedTireDampingNsPerM: number;
   frontBrakeBias: number;

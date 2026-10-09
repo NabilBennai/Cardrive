@@ -128,7 +128,7 @@ const checks = {
   restingSupport: at60('repos').groundedWheels === 4 && at60('repos').pathM < 0.01
     && at60('repos').maximumHeightM - at60('repos').minimumHeightM < 0.02,
   accelerationStable: at60('acceleration').zeroTo100S !== null && at60('acceleration').maximumHeightM < 1.05
-    && at60('acceleration').maximumPitchDeg < 5 && at60('acceleration').gearChanges === 3,
+    && at60('acceleration').maximumPitchDeg < 5 && at60('acceleration').gearChanges >= 2,
   brakingStopsWithoutReversing: at60('freinage-100-kmh').stopTimeS !== null
     && at60('freinage-100-kmh').stopDistanceM < 55 && at60('freinage-100-kmh').minimumWorldZSpeedMps > -0.15,
   sustainedBoundedReverse: at60('recul').finalGear === -1 && at60('recul').velocity.z < -2

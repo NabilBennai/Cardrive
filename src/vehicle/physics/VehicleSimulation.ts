@@ -117,8 +117,11 @@ export class VehicleSimulation {
     const driveForce = driveAllowed && this.shiftRemainingS === 0 && coupledRpmFor(ratio) < c.maximumRpm
       ? torque * ratio * c.finalDriveRatio * c.drivetrainEfficiency / c.wheelRadiusM * driveInput * direction * reverseLimiter : 0;
     const engineBrake = c.engineBrakeTorqueNm * ratio * c.finalDriveRatio / c.wheelRadiusM * (1 - driveInput);
-    const speedLimitedAngle = Math.atan(c.maximumCorneringAccelerationMps2 * c.wheelbaseM / Math.max(1, speedMps ** 2));
-    const maxSteer = Math.min(c.maxSteeringRad / (1 + speedMps * c.steeringReductionPerMps), speedLimitedAngle);
+    // Un volant réel n'est pas mécaniquement bridé par la vitesse : seule l'assistance
+    // s'allège. La limite de grip vient déjà du modèle de pneu (angle de dérive et
+    // ellipse de friction ci-dessous) ; brider l'angle lui-même ici empêchait de tourner
+    // normalement sur route alors qu'une C3 réelle le permet sans effort à 80 km/h.
+    const maxSteer = c.maxSteeringRad / (1 + speedMps * c.steeringReductionPerMps);
     this.steeringRad = moveTowards(this.steeringRad, clamp(input.steering, -1, 1) * maxSteer, c.steeringRateRadPerS * dt);
     this.steerRotation.setFromAxisAngle(this.up, -this.steeringRad);
     let groundedWheels = 0;
