@@ -9,10 +9,16 @@ import type { RoadGraph } from './roadGraph.ts';
 export function buildWayRibbon(points: Vector3[], halfWidthM: number, y: number): BufferGeometry {
   const count = points.length;
   const positions = new Float32Array(count * 2 * 3);
+  // U = travers (0 à gauche, 1 à droite), V = distance cumulée le long de la voie en mètres bruts
+  // (pas normalisé 0..1) : la texture d'asphalte se répète naturellement à une échelle réelle
+  // sans dépendre de la longueur totale de la voie.
+  const uvs = new Float32Array(count * 2 * 2);
   const tangent = new Vector3();
   const normal = new Vector3();
+  let cumulativeM = 0;
 
   for (let i = 0; i < count; i += 1) {
+    if (i > 0) cumulativeM += points[i].distanceTo(points[i - 1]);
     const previous = points[Math.max(0, i - 1)];
     const next = points[Math.min(count - 1, i + 1)];
     tangent.copy(next).sub(previous);
@@ -23,6 +29,8 @@ export function buildWayRibbon(points: Vector3[], halfWidthM: number, y: number)
     const right = points[i].clone().addScaledVector(normal, -halfWidthM);
     positions[i * 6 + 0] = left.x; positions[i * 6 + 1] = y; positions[i * 6 + 2] = left.z;
     positions[i * 6 + 3] = right.x; positions[i * 6 + 4] = y; positions[i * 6 + 5] = right.z;
+    uvs[i * 4 + 0] = 0; uvs[i * 4 + 1] = cumulativeM;
+    uvs[i * 4 + 2] = 1; uvs[i * 4 + 3] = cumulativeM;
   }
 
   const indices: number[] = [];
@@ -33,6 +41,7 @@ export function buildWayRibbon(points: Vector3[], halfWidthM: number, y: number)
 
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -47,8 +56,10 @@ export function buildJunctionFillerGeometry(center: Vector3, widestHalfWidthM: n
     center.x - half, y, center.z + half,
     center.x + half, y, center.z + half,
   ]);
+  const uvs = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
   geometry.setIndex([0, 1, 2, 1, 3, 2]);
   geometry.computeVertexNormals();
   return geometry;

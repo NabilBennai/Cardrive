@@ -10,11 +10,16 @@ const DRIVABLE_HIGHWAY_VALUES = [
   'service', 'living_street', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link',
 ];
 
-/** Requête Overpass QL : voies carrossables dans la zone, avec leurs nœuds (doc §7, étape 1 du pipeline). */
+/**
+ * Requête Overpass QL : voies carrossables ET empreintes de bâtiments dans la zone, avec leurs
+ * nœuds (doc §7, étape 1 du pipeline). Une seule requête groupée pour les deux : RawOsmData
+ * reste un {nodes, ways} plat, et chaque consommateur (roadGraph.ts / buildingGraph.ts) filtre
+ * par le tag qui le concerne (highway / building) sans se soucier de l'autre.
+ */
 export function buildOverpassQuery(bounds: GeoBounds): string {
   const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
   const highwayPattern = `^(${DRIVABLE_HIGHWAY_VALUES.join('|')})$`;
-  return `[out:json][timeout:${OVERPASS_TIMEOUT_S}];(way["highway"~"${highwayPattern}"](${bbox}););out body;>;out skel qt;`;
+  return `[out:json][timeout:${OVERPASS_TIMEOUT_S}];(way["highway"~"${highwayPattern}"](${bbox});way["building"](${bbox}););out body;>;out skel qt;`;
 }
 
 interface OverpassElement {

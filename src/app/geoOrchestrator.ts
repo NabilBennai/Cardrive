@@ -5,6 +5,7 @@ import { boundsAroundPoint } from '../map/predefinedPlaces.ts';
 import { OverpassProvider } from '../map/overpassProvider.ts';
 import { buildRoadGraph, EmptyRoadZoneError, type RoadGraph } from '../world/roads/roadGraph.ts';
 import { pickSpawnPose, type RoadSpawnPose } from '../world/roads/spawnPlacement.ts';
+import { buildBuildingGraph, type BuildingGraph } from '../world/buildings/buildingGraph.ts';
 import type { GeoPoint } from '../shared/types.ts';
 
 export type GeoLoadErrorKind = GeoProviderErrorKind | 'empty-result';
@@ -18,6 +19,7 @@ export class GeoLoadError extends Error {
 
 export interface LoadedRoadWorld {
   graph: RoadGraph;
+  buildingGraph: BuildingGraph;
   spawnPose: RoadSpawnPose;
   providerId: string;
 }
@@ -57,5 +59,8 @@ export async function loadRoadWorld(place: GeoPoint, signal: AbortSignal): Promi
   const spawnPose = pickSpawnPose(graph);
   if (!spawnPose) throw new GeoLoadError('empty-result', 'Aucun segment de route exploitable.');
 
-  return { graph, spawnPose, providerId: provider.id };
+  // Jamais d'erreur ici : zéro bâtiment dans la zone est un état normal, contrairement à zéro route.
+  const buildingGraph = buildBuildingGraph(raw, anchor);
+
+  return { graph, buildingGraph, spawnPose, providerId: provider.id };
 }

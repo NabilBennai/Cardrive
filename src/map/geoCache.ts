@@ -5,8 +5,12 @@ const DATABASE_VERSION = 1;
 const STORE_NAME = 'zones';
 
 /** Doc §8 : « Versionner les clés de cache avec le fournisseur et la version du générateur. »
- *  À incrémenter si le format de sortie de roadGraph/roadMesh change de façon incompatible. */
-export const GENERATOR_VERSION = 1;
+ *  À incrémenter si le format de sortie de roadGraph/roadMesh change de façon incompatible.
+ *  v2 : la requête Overpass demande désormais aussi les empreintes de bâtiments ; une entrée
+ *  en cache v1 vient d'une requête qui ne les a jamais demandées (pas de données obsolètes
+ *  mais valides à relire, il manque une vraie requête réseau) — bumper la version rend ces
+ *  clés orphelines au lieu de faire croire silencieusement qu'une zone n'a aucun bâtiment. */
+export const GENERATOR_VERSION = 2;
 export const MAX_AGE_MS = 24 * 60 * 60 * 1_000;
 export const MAX_ENTRIES = 40;
 

@@ -121,7 +121,9 @@ export function App() {
 
   const physicsPaused = useMemo(() => !playing || paused || tabHidden, [playing, paused, tabHidden]);
   const drivingWorld: DrivingWorld = useMemo(
-    () => (!useDemoTrack && roadWorld ? { kind: 'roads', graph: roadWorld.graph, spawnPose: roadWorld.spawnPose } : { kind: 'demo' }),
+    () => (!useDemoTrack && roadWorld
+      ? { kind: 'roads', graph: roadWorld.graph, buildingGraph: roadWorld.buildingGraph, spawnPose: roadWorld.spawnPose }
+      : { kind: 'demo' }),
     [useDemoTrack, roadWorld],
   );
 

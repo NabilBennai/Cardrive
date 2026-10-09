@@ -8,9 +8,10 @@ import { DemoTrack } from '../world/terrain/DemoTrack';
 import { RoadNetwork } from '../world/roads/RoadNetwork';
 import type { RoadGraph } from '../world/roads/roadGraph';
 import type { RoadSpawnPose } from '../world/roads/spawnPlacement';
+import type { BuildingGraph } from '../world/buildings/buildingGraph';
 import { headingToQuaternion, VEHICLE_FIXED_STEP_S } from '../vehicle/physics/vehicleBody';
 
-export type DrivingWorld = { kind: 'demo' } | { kind: 'roads'; graph: RoadGraph; spawnPose: RoadSpawnPose };
+export type DrivingWorld = { kind: 'demo' } | { kind: 'roads'; graph: RoadGraph; buildingGraph: BuildingGraph; spawnPose: RoadSpawnPose };
 
 interface DrivingSceneProps {
   input: React.RefObject<VehicleInput>;
@@ -42,7 +43,7 @@ export function DrivingScene({ input, bodyRef, telemetryRef, paused, respawnVers
       <directionalLight position={[-30, 48, 20]} intensity={2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-75} shadow-camera-right={75} shadow-camera-top={75} shadow-camera-bottom={-75} />
       <Physics gravity={[0, -9.81, 0]} timeStep={VEHICLE_FIXED_STEP_S} interpolate paused={paused}>
         <Suspense fallback={null}>
-          {world.kind === 'demo' ? <DemoTrack /> : <RoadNetwork graph={world.graph} />}
+          {world.kind === 'demo' ? <DemoTrack /> : <RoadNetwork graph={world.graph} buildingGraph={world.buildingGraph} />}
           <GenericCar bodyRef={bodyRef} input={input} telemetryRef={telemetryRef} respawnVersion={respawnVersion} onTelemetry={onTelemetry} spawnPose={spawnPose} />
           <ChaseCamera bodyRef={bodyRef} snapVersion={respawnVersion} />
         </Suspense>
