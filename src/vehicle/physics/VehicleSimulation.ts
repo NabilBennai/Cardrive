@@ -2,6 +2,10 @@ import type { RapierContext, RapierRigidBody } from '@react-three/rapier';
 import { Quaternion, Vector3 } from 'three';
 import type { SurfaceMaterial, VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types.ts';
 import { SURFACES, type SurfaceProvider } from './surfaces.ts';
+import {
+  applyImpact, createDamage, createRandom, flatTireGripFactor, flatTireRollingFactor, powerScale, repair, steeringPullRad, stepTireLeak,
+  type DamageState,
+} from './damageModel.ts';
 import { aquaplaningGripFactor, effectiveAmbientC, wetGripFactor, wetRollingFactor } from '../../world/weather/weatherModel.ts';
 import { fuelBurnedKg, wearGripFactor, wearIncrement } from './wearModel.ts';
 import {
@@ -114,6 +118,9 @@ export class VehicleSimulation {
   /** Humidité de la piste (0..1) et température de l'air (°C) ; null = celle de la configuration. */
   private wetness = 0;
   private airC: number | null = null;
+  private damageEnabled = false;
+  private readonly damageState: DamageState;
+  private readonly damageRandom = createRandom(0x5eed);
   private wearEnabled = false;
   /** Usure de chaque pneu (0 neuf … 1 lisse). */
   private readonly wear: number[];
@@ -151,6 +158,7 @@ export class VehicleSimulation {
       temperatureC: config.ambientTemperatureC, carcassTemperatureC: config.ambientTemperatureC,
       grounded: false, slidingPowerW: 0, contactX: 0, contactY: 0, contactZ: 0, surface: 'asphalt' as SurfaceMaterial,
     }));
+    this.damageState = createDamage(config.wheelMounts.length);
     this.wear = config.wheelMounts.map(() => 0);
     this.fuelKg = config.fuelCapacityKg;
     this.appliedMassKg = config.massKg;
@@ -242,6 +250,26 @@ export class VehicleSimulation {
   setWearEnabled(enabled: boolean) {
     this.wearEnabled = enabled;
   }
+
+  /** Active les dégâts (désactivés par défaut : un choc ne coûte rien). */
+  setDamageEnabled(enabled: boolean) {
+    this.damageEnabled = enabled;
+  }
+
+  /**
+   * Choc subi : intensité 0..1 et direction du mouvement avant le choc dans le repère du véhicule (x gauche, z avant).
+   * Sans effet si les dégâts sont désactivés.
+   */
+  registerImpact(intensity: number, localDirX: number, localDirZ: number) {
+    if (this.damageEnabled) applyImpact(this.damageState, intensity, localDirX, localDirZ, this.damageRandom());
+  }
+
+  /** Remet la voiture en état (moteur, direction, pneus, carrosserie). */
+  repairCar() {
+    repair(this.damageState);
+  }
+
+  get damage(): Readonly<DamageState> { return this.damageState; }
 
   /** Pneus neufs et réservoir plein (arrêt au stand). */
   service() {
@@ -378,7 +406,7 @@ export class VehicleSimulation {
     const tractionScale = this.updateTractionControl(driveInput, direction);
     const hasFuel = !this.wearEnabled || c.fuelCapacityKg <= 0 || this.fuelKg > 0;
     const driveWheelTorqueNm = driveAllowed && clutchEngaged && !this.stalled && hasFuel && wheelCoupledRpm < c.maximumRpm
-      ? torque * overallRatio * c.drivetrainEfficiency * driveInput * direction * reverseLimiter * tractionScale : 0;
+      ? torque * overallRatio * c.drivetrainEfficiency * driveInput * direction * reverseLimiter * tractionScale * (this.damageEnabled ? powerScale(this.damageState) : 1) : 0;
     if (this.wearEnabled && c.fuelCapacityKg > 0) this.burnFuel(body, torque * this.rpm * 2 * Math.PI / 60 * driveInput * (hasFuel ? 1 : 0), dt);
     const engineBrakeWheelTorqueNm = c.engineBrakeTorqueNm * overallRatio * (1 - driveInput);
     // Inertie du moteur ramenée à chaque roue motrice (embrayage fermé) : c'est elle qui limite la vitesse de montée en régime.
@@ -389,7 +417,10 @@ export class VehicleSimulation {
     // ellipse de friction ci-dessous) ; brider l'angle lui-même ici empêchait de tourner
     // normalement sur route alors qu'une C3 réelle le permet sans effort à 80 km/h.
     const maxSteer = c.maxSteeringRad / (1 + speedMps * c.steeringReductionPerMps);
-    this.steeringRad = moveTowards(this.steeringRad, clamp(input.steering, -1, 1) * maxSteer, c.steeringRateRadPerS * dt);
+    // Direction faussée : le véhicule tire d'un côté (braquage parasite constant).
+    const steeringPull = this.damageEnabled ? steeringPullRad(this.damageState) : 0;
+    if (this.damageEnabled) stepTireLeak(this.damageState, dt);
+    this.steeringRad = moveTowards(this.steeringRad, clamp(input.steering, -1, 1) * maxSteer + steeringPull, c.steeringRateRadPerS * dt);
     this.steerRotation.setFromAxisAngle(this.up, -this.steeringRad);
     let groundedWheels = 0;
     let maximumNormalizedSlip = 0;
@@ -448,6 +479,10 @@ export class VehicleSimulation {
           if (this.surfaceProvider) pose.surface = this.surfaceProvider(this.point.x, this.point.z, index);
           gripFactor *= SURFACES[pose.surface].gripFactor;
           let rollingFactor = SURFACES[pose.surface].rollingFactor;
+          if (this.damageEnabled && this.damageState.tireFlat[index] > 0) {
+            gripFactor *= flatTireGripFactor(this.damageState.tireFlat[index]);
+            rollingFactor *= flatTireRollingFactor(this.damageState.tireFlat[index]);
+          }
           if (this.wetness > 0) {
             gripFactor *= wetGripFactor(pose.surface, this.wetness);
             rollingFactor *= wetRollingFactor(pose.surface, this.wetness);
@@ -562,6 +597,7 @@ export class VehicleSimulation {
       tireTemperaturesC: this.wheelPoses.map((pose) => pose.temperatureC),
       positionM: { xM: this.position.x, zM: this.position.z },
       headingRad: Math.atan2(this.forward.x, this.forward.z),
+      ...(this.damageEnabled ? { damage: { engine: this.damageState.engine, steering: this.damageState.steering, tireFlat: this.damageState.tireFlat.slice() } } : {}),
       ...(this.wearEnabled ? { tireWear: this.wear.slice(), fuelKg: this.fuelKg, fuelCapacityKg: c.fuelCapacityKg } : {}),
       ...(this.transmission === 'manual' ? { advisedShift: this.advisedShift, stalled: this.stalled } : {}) };
   }

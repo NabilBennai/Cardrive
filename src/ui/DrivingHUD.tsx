@@ -52,6 +52,12 @@ export function DrivingHUD({ maxRpm, tireOptimalC, telemetry, paused, onPause, z
           <div className="detail-row"><span>Régime</span><b>{Math.round(telemetry.engineRpm).toLocaleString('fr-FR')} tr/min</b></div>
           <div className="detail-row"><span>Adhérence</span><b className={gripLimit ? 'warning' : ''}>{gripLimit ? 'Glisse' : `${gripUsedPercent} % utilisé`}</b></div>
           <div className="detail-row"><span>Roues au sol</span><b>{telemetry.groundedWheels} / 4</b></div>
+          {telemetry.damage ? (
+            <>
+              <div className="detail-row"><span>Moteur</span><b className={telemetry.damage.engine > 0.3 ? 'warning' : ''}>{Math.round((1 - telemetry.damage.engine) * 100)} % de puissance</b></div>
+              <div className="detail-row"><span>Direction</span><b className={telemetry.damage.steering > 0.3 ? 'warning' : ''}>{telemetry.damage.steering > 0.05 ? `faussée ${Math.round(telemetry.damage.steering * 100)} %` : 'saine'}</b></div>
+            </>
+          ) : null}
           {telemetry.fuelKg !== undefined && telemetry.fuelCapacityKg ? (
             <div className="detail-row"><span>Carburant</span><b className={fuelShare < 0.1 ? 'warning' : ''}>{Math.round(fuelShare * 100)} % · {Math.round(telemetry.fuelKg)} kg</b></div>
           ) : null}
@@ -67,6 +73,7 @@ export function DrivingHUD({ maxRpm, tireOptimalC, telemetry, paused, onPause, z
       )}
 
       {gripLimit && <p className="limit-pill" role="status">Adhérence limite</p>}
+      {telemetry.damage && telemetry.damage.tireFlat.some((flat) => flat > 0.05) ? <p className="limit-pill damage-pill" role="status">Pneu crevé</p> : telemetry.damage && telemetry.damage.engine > 0.3 ? <p className="limit-pill damage-pill" role="status">Moteur endommagé</p> : null}
       {fuelShare < 0.1 && telemetry.fuelCapacityKg ? <p className="limit-pill fuel-pill" role="status">{telemetry.fuelKg === 0 ? 'Panne sèche' : 'Carburant bas'}</p> : null}
 
       <section className="cluster" aria-label={`Vitesse ${kmh(telemetry.speedMps)} kilomètres par heure, rapport ${telemetry.gear < 0 ? 'arrière' : telemetry.gear}`}>

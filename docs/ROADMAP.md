@@ -195,7 +195,7 @@ Le jeu était muet : c’est ce qui lui retirait le plus de vie. Tout est synth�
 
 ---
 
-## 6. Phase 3 — Physique avancée 🟡
+## 6. Phase 3 — Physique avancée 🟡 (reste : R-3.2 relief)
 
 Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout : ajouter le mécanisme **et** son scénario de calibration.
 
@@ -243,9 +243,14 @@ Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout :
 - **Absents** : humidité par zone et « trajectoire sèche » qui se forme (l'humidité est la même partout, pas de flaques), pneus pluie / intermédiaires, jour et nuit, ciel (R-4.4), pluie sur les routes réelles (le sol y reste visuellement sec, seule la physique change).
 - Vérifié : 8 tests de modèle et de solveur (montée et séchage, grip, aquaplanage, freinage mouillé ≥ ×1,3 à 28 m/s et plus pénalisant à 40 m/s, température), 2 tests de tours complets, e2e (réglage mémorisé, message, rendu sous forte pluie). L'aspect visuel est jugé sur une capture seulement.
 
-### R-3.7 Dégâts et collisions — L ⬜
-- Dégâts mécaniques (perte de puissance, déséquilibre de direction, pneu qui crève) selon l’énergie d’impact, et déformation visuelle simple (déplacement de sommets du modèle). Le collider reste un pavé : ne pas viser BeamNG.
-- **Options** : mode « sans dégâts » (par défaut) pour ne pas pénaliser les débutants.
+### R-3.7 Dégâts et collisions ✅ (joueur seulement, désactivés par défaut)
+- **Réglage** « Dégâts : Désactivés / Activés » dans le menu pause (mémorisé, **désactivés par défaut** : un choc ne coûte rien aux débutants) et bouton « Réparer la voiture ». Les adversaires ne subissent pas de dégâts.
+- **Énergie du choc** : la même détection que le son et les étincelles (variation de vitesse en un pas, > 2,5 m/s) donne une intensité 0..1 ; sous 0,12 (≈ 5 m/s) rien n'est abîmé. La zone touchée (avant, arrière, gauche, droite) vient de la direction du mouvement avant le choc dans le repère du véhicule.
+- **Effets mécaniques** : choc de face → moteur (perte de puissance jusqu'à 65 %) et direction faussée (braquage parasite jusqu'à 0,07 rad, côté tiré au sort de façon déterministe) ; choc latéral → direction ; choc arrière → léger. Au-delà de 0,45 d'intensité, **un pneu du côté touché crève** : il se vide en 4 s, perd jusqu'à 55 % d'adhérence et multiplie par 4 la résistance au roulement. Les dégâts s'accumulent jusqu'à 1.
+- **Déformation visuelle** : la carrosserie (hors roues) est froissée par déplacement de sommets (zone de 30 % de la longueur ou de la largeur, repoussée vers l'intérieur avec une irrégularité déterministe), sur une copie de la géométrie (les modèles du catalogue sont partagés) et recalculée seulement quand les dégâts changent ; la réparation restitue la géométrie d'origine. Le collider reste un pavé.
+- **Interface** : détails (T) « Moteur : N % de puissance » et « Direction : saine / faussée N % », messages « Pneu crevé » et « Moteur endommagé ».
+- Vérifié : 17 tests (modèle, zones, accumulation, fuite des pneus, réparation, déterminisme, effets dans le solveur — moteur abîmé plus lent, direction faussée qui dérive —, contrôleur de froissement sur un maillage partagé), e2e : un choc contre le mur à pleine vitesse fait passer le moteur de 100 % à 25 % de puissance, puis « Réparer » le remet à 100 %. **Non vérifié à l'œil** : le froissement n'a pas été regardé à l'écran (la caméra est derrière la voiture et le choc est de face).
+- **Limites** : pas de dégâts aux adversaires ; pas de bris de pièces ni de feu ; les pneus crevés ne sont pas animés (la roue ne s'aplatit pas visuellement) ; la direction faussée n'est pas visible sur le volant.
 
 ### R-3.8 Boîte manuelle et embrayage 🟡 (sans pédale d'embrayage)
 - Réglage « Boîte de vitesses : Automatique / Manuelle » dans le menu pause (mémorisé, automatique par défaut ; clavier uniquement, le tactile reste en automatique). **E** monte, **C** rétrograde (PageUp / PageDown aussi) : un appui = un rapport, avec coupure de couple pendant le passage.

@@ -6,9 +6,11 @@ export interface AssistSettings {
   transmission: Transmission;
   /** Usure des pneus et consommation de carburant. */
   wearAndFuel: boolean;
+  /** Dégâts selon l'énergie des chocs (désactivés par défaut : les débutants ne sont pas pénalisés). */
+  damage: boolean;
 }
 
-export const DEFAULT_ASSISTS: AssistSettings = { tractionControl: 'medium', transmission: 'auto', wearAndFuel: true };
+export const DEFAULT_ASSISTS: AssistSettings = { tractionControl: 'medium', transmission: 'auto', wearAndFuel: true, damage: false };
 export const ASSISTS_KEY = 'cardrive.assists';
 export const TRANSMISSION_LABELS: Record<Transmission, string> = { auto: 'Automatique', manual: 'Manuelle' };
 export const TRACTION_LABELS: Record<TractionControl, string> = { off: 'Aucune', medium: 'Moyenne', full: 'Complète' };
@@ -23,6 +25,7 @@ export function sanitizeAssists(value: unknown): AssistSettings {
     tractionControl: level === 'off' || level === 'medium' || level === 'full' ? level : DEFAULT_ASSISTS.tractionControl,
     transmission: transmission === 'auto' || transmission === 'manual' ? transmission : DEFAULT_ASSISTS.transmission,
     wearAndFuel: typeof candidate.wearAndFuel === 'boolean' ? candidate.wearAndFuel : DEFAULT_ASSISTS.wearAndFuel,
+    damage: typeof candidate.damage === 'boolean' ? candidate.damage : DEFAULT_ASSISTS.damage,
   };
 }
 

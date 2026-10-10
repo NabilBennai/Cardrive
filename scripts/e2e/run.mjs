@@ -615,6 +615,43 @@ try {
     }
   });
 
+  await scenario('Dégâts : un choc contre le mur abîme moteur et direction, « Réparer » remet à neuf', async () => {
+    try {
+      await home(page);
+      await page.eval(`localStorage.setItem('cardrive.assists', JSON.stringify({ tractionControl: 'medium', transmission: 'auto', wearAndFuel: true, damage: true }))`);
+      await home(page);
+      await page.click('Circuits F1 2026');
+      await page.waitFor("document.querySelector('.circuit-card')", 'le catalogue de circuits');
+      if (!(await page.click('Singapour'))) throw new Error('Circuit de Singapour introuvable.');
+      await page.waitFor("document.querySelector('.lap-hud')", 'le chrono');
+      await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement de la scène', 90_000);
+      await page.tap('KeyT', 't');
+      await page.waitFor("document.querySelector('.details-panel')", 'les détails du véhicule');
+      const power = async () => Number.parseInt((await page.eval("[...document.querySelectorAll('.detail-row')].find((row) => row.textContent.startsWith('Moteur'))?.textContent ?? ''")).replace(/\D+/, ''), 10);
+      await page.waitFor("[...document.querySelectorAll('.detail-row')].some((row) => row.textContent.startsWith('Moteur'))", 'la ligne « Moteur » des détails', 15_000);
+      const healthy = await power();
+      if (healthy !== 100) throw new Error(`Moteur sain attendu à 100 % de puissance (« ${healthy} »).`);
+      // Plein gaz tout droit : la voiture finit contre le mur de la première courbe.
+      await page.key('keyDown', 'KeyW', 'w');
+      const startedAt = Date.now();
+      let damaged = 100;
+      while (Date.now() - startedAt < 25_000 && damaged >= 100) { await sleep(500); damaged = await power(); }
+      await page.key('keyUp', 'KeyW', 'w');
+      if (damaged >= 100) throw new Error('Aucun dégât après un choc contre le mur.');
+      await page.tap('Escape', 'Escape');
+      await page.waitFor("document.querySelector('.pause-panel')", 'le panneau de pause');
+      if (!(await page.click('Réparer la voiture'))) throw new Error('Bouton « Réparer la voiture » introuvable.');
+      await page.waitFor("!document.querySelector('.pause-panel')", 'la reprise après réparation');
+      await sleep(600);
+      const repaired = await power();
+      if (repaired !== 100) throw new Error(`Moteur non réparé (${repaired} % de puissance).`);
+      assertNoProblems(page, 'degats');
+      return `moteur ${healthy} % → ${damaged} % après le choc, réparé à ${repaired} %`;
+    } finally {
+      await page.eval("localStorage.removeItem('cardrive.assists')");
+    }
+  });
+
   await scenario("Choix d'un véhicule (Camion) et conduite à Singapour", async () => {
     await home(page);
     await page.click('Garage');

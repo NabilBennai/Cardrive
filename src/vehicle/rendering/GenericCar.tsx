@@ -10,6 +10,7 @@ import type { TractionControl, Transmission } from '../physics/VehicleSimulation
 import { extrapolationSeconds } from '../physics/stepClock';
 import type { SurfaceProvider } from '../physics/surfaces';
 import { KenneyCarModel } from './KenneyCarModel';
+import { CrumpleController } from './crumpleObject';
 import {
   resetVehicleBody, vehicleColliderMassProperties, vehicleColliderOffsetY, vehicleSpawnHeightM,
   VEHICLE_COLLIDER_FRICTION, VEHICLE_COLLIDER_RESTITUTION, VEHICLE_SPAWN,
@@ -52,6 +53,10 @@ interface GenericCarProps {
   serviceVersion?: number;
   /** Conditions du moment, partagées par toutes les voitures de la scène. */
   environmentRef?: React.RefObject<{ wetness: number; airC: number }>;
+  /** Dégâts selon les chocs du joueur ; absent : désactivés. */
+  damageEnabled?: boolean;
+  /** Incrémenté pour réparer la voiture. */
+  repairVersion?: number;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
@@ -376,13 +381,16 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef, drivesClock, respawnPoseRef, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion, environmentRef }: GenericCarProps) {
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef, drivesClock, respawnPoseRef, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion, environmentRef, damageEnabled, repairVersion }: GenericCarProps) {
   const wheelPosesRef = useRef(initialWheelPoses(config));
-  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep, drivesClock, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion, environmentRef });
+  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep, drivesClock, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion, environmentRef, damageEnabled, repairVersion });
   const previousRespawnVersion = useRef(respawnVersion);
   // Après useVehiclePhysics (qui installe le tableau de poses du solveur) : on publie ce même tableau.
   useLayoutEffect(() => { if (wheelPosesOutRef) wheelPosesOutRef.current = wheelPosesRef.current; }, [wheelPosesOutRef]);
   const visualRef = useRef<Group>(null);
+  const proceduralBodyRef = useRef<Group>(null);
+  const crumple = useRef<CrumpleController | null>(null);
+  const damageState = physics.simulation.damage;
   const extrapolation = useRef({ offset: new Vector3(), bodyRotation: new Quaternion(), inverse: new Quaternion(), delta: new Quaternion(), axis: new Vector3() });
 
   // Lissage visuel par EXTRAPOLATION : la physique avance à 60 Hz fixes, le rendu à sa propre cadence. Plutôt que
@@ -391,6 +399,12 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
   // les visuels de vitesse × temps écoulé depuis le dernier pas, dans le repère local du châssis. Aucun état passé : un
   // déplacement d'origine ou un respawn est donc invisible.
   useFrame(() => {
+    // Carrosserie procédurale : froissée quand les dégâts changent (les modèles du catalogue le font eux-mêmes).
+    const proceduralBody = proceduralBodyRef.current;
+    if (proceduralBody && (damageState.bodyVersion > 0 || crumple.current)) {
+      crumple.current ??= new CrumpleController(proceduralBody, () => true);
+      crumple.current.sync(damageState);
+    }
     const visual = visualRef.current;
     const body = bodyRef.current;
     if (!visual || !body) return;
@@ -471,11 +485,11 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
       <group ref={visualRef}>
       {modelUrl ? (
         <Suspense fallback={null}>
-          <KenneyCarModel url={modelUrl} config={config} wheelPosesRef={wheelPosesRef} groundOffsetM={-groundDistanceM(config)} />
+          <KenneyCarModel url={modelUrl} config={config} wheelPosesRef={wheelPosesRef} groundOffsetM={-groundDistanceM(config)} damage={damageState} />
         </Suspense>
       ) : (
         <>
-          <group position={[0, GROUND_OFFSET_M, 0]}>
+          <group ref={proceduralBodyRef} position={[0, GROUND_OFFSET_M, 0]}>
             <mesh geometry={bodyShellGeometry} castShadow receiveShadow>
               <meshStandardMaterial color={PAINT_COLOR} metalness={0.42} roughness={0.3} />
             </mesh>

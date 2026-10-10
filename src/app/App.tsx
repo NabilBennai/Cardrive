@@ -128,6 +128,14 @@ export function App() {
       return next;
     });
   }, []);
+  const chooseDamage = useCallback((damage: boolean) => {
+    setAssists((current) => {
+      const next = { ...current, damage };
+      saveAssists(next);
+      return next;
+    });
+  }, []);
+  const [repairVersion, setRepairVersion] = useState(0);
   const [serviceVersion, setServiceVersion] = useState(0);
   const [showCarPicker, setShowCarPicker] = useState(false);
   const [showCircuitPicker, setShowCircuitPicker] = useState(false);
@@ -328,6 +336,8 @@ export function App() {
               transmission={isTouchDevice ? 'auto' : assists.transmission}
               wearEnabled={assists.wearAndFuel}
               serviceVersion={serviceVersion}
+              damageEnabled={assists.damage}
+              repairVersion={repairVersion}
               weather={weather}
               onWetnessChange={setWetness}
               onFlippedChange={setFlipped}
@@ -453,6 +463,14 @@ export function App() {
                   <button aria-pressed={assists.wearAndFuel} onClick={() => chooseWear(true)}>Activés</button>
                 </div>
               </div>
+              <div className="setup-row">
+                <span>Dégâts</span>
+                <div className="segmented" role="group" aria-label="Dégâts">
+                  <button aria-pressed={!assists.damage} onClick={() => chooseDamage(false)}>Désactivés</button>
+                  <button aria-pressed={assists.damage} onClick={() => chooseDamage(true)}>Activés</button>
+                </div>
+              </div>
+              {assists.damage && <button className="btn-quiet" onClick={() => { setRepairVersion((value) => value + 1); resumeGame(); }}>Réparer la voiture</button>}
               {assists.wearAndFuel && <button className="btn-quiet" onClick={() => { setServiceVersion((value) => value + 1); resumeGame(); }}>Pneus neufs et plein</button>}
             </fieldset>
             <AudioSettingsPanel settings={audioSettings} onChange={updateAudioSettings} />

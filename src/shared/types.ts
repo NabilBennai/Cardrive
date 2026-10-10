@@ -24,6 +24,8 @@ export interface VehicleTelemetry {
   headingRad: number;
   /** Boîte manuelle : rapport conseillé (+1 monter, -1 rétrograder, 0 aucun). Absent en boîte automatique. */
   /** Usure de chaque pneu (0 neuf … 1 lisse) et carburant restant (kg) ; présents seulement si l'usure est activée. */
+  /** Dégâts (0 intact … 1) : moteur, direction, pneus à plat ; présents seulement si les dégâts sont activés. */
+  damage?: { engine: number; steering: number; tireFlat: number[] };
   tireWear?: number[];
   fuelKg?: number;
   fuelCapacityKg?: number;

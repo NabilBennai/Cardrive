@@ -102,8 +102,8 @@ describe('réglage des aides', () => {
     expect(sanitizeAssists({ tractionControl: 'full' }).tractionControl).toBe('full');
     const data = new Map<string, string>();
     const storage = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => { data.set(k, v); } };
-    saveAssists({ tractionControl: 'off', transmission: 'manual', wearAndFuel: false }, storage);
-    expect(loadAssists(storage)).toEqual({ tractionControl: 'off', transmission: 'manual', wearAndFuel: false });
+    saveAssists({ tractionControl: 'off', transmission: 'manual', wearAndFuel: false, damage: true }, storage);
+    expect(loadAssists(storage)).toEqual({ tractionControl: 'off', transmission: 'manual', wearAndFuel: false, damage: true });
     data.set('cardrive.assists', 'pas du json');
     expect(loadAssists(storage)).toEqual(DEFAULT_ASSISTS);
   });

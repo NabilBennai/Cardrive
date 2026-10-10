@@ -74,6 +74,9 @@ interface DrivingSceneProps {
   /** Usure des pneus et carburant du joueur, et compteur d'arrêts au stand (pneus neufs, plein). */
   wearEnabled?: boolean;
   serviceVersion?: number;
+  /** Dégâts selon les chocs du joueur, et compteur de réparations. */
+  damageEnabled?: boolean;
+  repairVersion?: number;
   /** Voiture du joueur retournée (état) et remise en piste d'office en course. */
   onFlippedChange?: (flipped: boolean) => void;
   onAutoRecover?: () => void;
@@ -93,7 +96,7 @@ interface DrivingSceneProps {
 }
 
 export function DrivingScene({
-  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot, tractionControl, transmission, wearEnabled, serviceVersion, weather = DRY_WEATHER, onWetnessChange = ignoreWetness, onFlippedChange, onAutoRecover,
+  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot, tractionControl, transmission, wearEnabled, serviceVersion, damageEnabled, repairVersion, weather = DRY_WEATHER, onWetnessChange = ignoreWetness, onFlippedChange, onAutoRecover,
 }: DrivingSceneProps) {
   // Poses de roues du solveur, partagées avec les effets de pneus (fumée, traces).
   const wheelPosesRef = useRef<WheelPose[] | null>(null);
@@ -169,6 +172,8 @@ export function DrivingScene({
             transmission={transmission}
             wearEnabled={wearEnabled}
             serviceVersion={serviceVersion}
+            damageEnabled={damageEnabled}
+            repairVersion={repairVersion}
           />
           <FloatingOriginApplier origin={floatingOrigin} />
           <ChaseCamera bodyRef={bodyRef} snapVersion={respawnVersion} effects={cameraEffects} />

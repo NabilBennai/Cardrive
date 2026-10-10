@@ -1,5 +1,6 @@
 ﻿import { useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { impactChannel } from '../../feel/feelBus';
 import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types';
 import { perfStats } from '../../debug/perfStats';
 import { markPhysicsStep } from './stepClock';
@@ -38,9 +39,13 @@ export interface VehiclePhysicsOptions {
   serviceVersion?: number;
   /** Conditions du moment (humidité de la piste, température de l'air), partagées par toutes les voitures de la scène. */
   environmentRef?: React.RefObject<{ wetness: number; airC: number }>;
+  /** Dégâts selon l'énergie des chocs (voiture du joueur seulement) ; absent : désactivés. */
+  damageEnabled?: boolean;
+  /** Incrémenté pour réparer la voiture. */
+  repairVersion?: number;
 }
 
-export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true, surfaceAt, tractionControl = 'off', transmission = 'auto', wearEnabled = false, serviceVersion = 0, environmentRef }: VehiclePhysicsOptions) {
+export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true, surfaceAt, tractionControl = 'off', transmission = 'auto', wearEnabled = false, serviceVersion = 0, environmentRef, damageEnabled = false, repairVersion = 0 }: VehiclePhysicsOptions) {
   const { rapier } = useRapier();
   const simulation = useMemo(() => new VehicleSimulation(config), [config]);
   const telemetryDelay = useRef(0);
@@ -52,6 +57,26 @@ export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelP
   useLayoutEffect(() => { simulation.setTractionControl(tractionControl); }, [simulation, tractionControl]);
   useLayoutEffect(() => { simulation.setTransmission(transmission); }, [simulation, transmission]);
   useLayoutEffect(() => { simulation.setWearEnabled(wearEnabled); }, [simulation, wearEnabled]);
+  useLayoutEffect(() => { simulation.setDamageEnabled(damageEnabled); }, [simulation, damageEnabled]);
+  const repairedVersion = useRef(repairVersion);
+  useLayoutEffect(() => {
+    if (repairedVersion.current === repairVersion) return;
+    repairedVersion.current = repairVersion;
+    simulation.repairCar();
+  }, [simulation, repairVersion]);
+  // Les chocs du joueur (détectés par AudioDriver) abîment la voiture dans la zone touchée.
+  useEffect(() => {
+    if (!damageEnabled || !drivesClock) return undefined;
+    return impactChannel.subscribe((event) => {
+      const body = bodyRef.current;
+      if (!body) return;
+      const r = body.rotation();
+      const heading = Math.atan2(2 * (r.x * r.z + r.w * r.y), 1 - 2 * (r.x * r.x + r.y * r.y));
+      const cos = Math.cos(heading);
+      const sin = Math.sin(heading);
+      simulation.registerImpact(event.intensity, event.dirX * cos - event.dirZ * sin, event.dirX * sin + event.dirZ * cos);
+    });
+  }, [simulation, damageEnabled, drivesClock, bodyRef]);
   const servicedVersion = useRef(serviceVersion);
   useLayoutEffect(() => {
     if (servicedVersion.current === serviceVersion) return;
@@ -80,5 +105,5 @@ export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelP
       telemetryCallback.current(telemetry);
     }
   });
-  return { wheelMounts: config.wheelMounts };
+  return { wheelMounts: config.wheelMounts, simulation };
 }
