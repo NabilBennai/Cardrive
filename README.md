@@ -11,7 +11,7 @@ npm install
 npm run dev        # serveur de développement
 ```
 
-Commandes : `ZQSD` ou les flèches pour conduire, `Espace` frein à main, `R` repositionner, `Échap` pause, `T` détails du véhicule, `M` couper le son, `F3` panneau de performance. Le son est entièrement synthétisé ; ses réglages sont dans le menu pause.
+Commandes : `ZQSD` ou les flèches pour conduire, `Espace` frein à main, `R` repositionner, `Échap` pause, `T` détails du véhicule, `E` / `C` rapport supérieur / inférieur (boîte manuelle, à régler dans le menu pause), `M` couper le son, `F3` panneau de performance. Le son est entièrement synthétisé ; ses réglages sont dans le menu pause.
 
 ## Vérifier
 

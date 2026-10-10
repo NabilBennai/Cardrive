@@ -237,9 +237,11 @@ Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout :
 - Dégâts mécaniques (perte de puissance, déséquilibre de direction, pneu qui crève) selon l’énergie d’impact, et déformation visuelle simple (déplacement de sommets du modèle). Le collider reste un pavé : ne pas viser BeamNG.
 - **Options** : mode « sans dégâts » (par défaut) pour ne pas pénaliser les débutants.
 
-### R-3.8 Boîte manuelle et embrayage — M ⬜
-- Mode manuel (montée/descente de rapport au clavier ou à la manette), embrayage modélisé (couple transmis limité, patinage au démarrage), régime moteur libre. Le solveur sait déjà lier le régime aux roues motrices et réfléchir l’inertie moteur ; il manque la sélection de rapport par le joueur et la mise en neutre.
-- **Fin** : calage possible, rétrogradage trop haut en régime bridé (ou dommage), indicateur de rapport conseillé.
+### R-3.8 Boîte manuelle et embrayage 🟡 (sans pédale d'embrayage)
+- Réglage « Boîte de vitesses : Automatique / Manuelle » dans le menu pause (mémorisé, automatique par défaut ; clavier uniquement, le tactile reste en automatique). **E** monte, **C** rétrograde (PageUp / PageDown aussi) : un appui = un rapport, avec coupure de couple pendant le passage.
+- En manuelle : aucun changement automatique (plein gaz en 1re, on tape dans le limiteur) ; rétrogradation **refusée** si elle porterait le moteur au-delà de 102 % du régime maximal ; **calage** si l'on charge le moteur hors première sous la moitié du ralenti (démarrer en 3e), redémarrage accélérateur relâché après 1,2 s, en 1re ; flèche ▲ / ▼ de **rapport conseillé** sur l'indicateur de rapport, « × » et message quand le moteur est calé.
+- Vérifié : 7 tests unitaires (pas de passage automatique, un appui = un rapport, rétrogradation refusée à 45 m/s et acceptée à 12 m/s, calage et redémarrage, conseil, absence de conseil en automatique) ; e2e dans le navigateur (rapport tenu en 1re, E → 2e, C → 1re).
+- **Limites** : pas d'embrayage modélisé (pas de pédale : l'embrayage est géré automatiquement, il ne patine pas au démarrage) ; pas de neutre ; marche arrière toujours obtenue en freinant à l'arrêt ; pas de dégâts moteur en cas de sur-régime (la rétrogradation est simplement refusée).
 
 ### R-3.9 Franchissement et stabilité — M ⬜
 - Test de retournement et de remise sur roues (aujourd’hui `R` repositionne), protection contre les erreurs numériques à très haute vitesse (CCD actif, valider à 350 km/h sur la voiture de course futuriste), limites de vitesse angulaire.

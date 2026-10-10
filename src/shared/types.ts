@@ -3,6 +3,9 @@ export interface VehicleInput {
   brake: number;
   steering: number;
   handbrake: number;
+  /** Boîte manuelle : rapport supérieur / inférieur demandé (touche enfoncée ; un seul changement par appui). */
+  shiftUp?: boolean;
+  shiftDown?: boolean;
 }
 
 export interface VehicleTelemetry {
@@ -19,6 +22,10 @@ export interface VehicleTelemetry {
   /** Position locale du châssis (mètres, repère de la zone chargée) et lacet (rad, atan2(forward.x, forward.z)) : pour la mini-carte. */
   positionM: { xM: number; zM: number };
   headingRad: number;
+  /** Boîte manuelle : rapport conseillé (+1 monter, -1 rétrograder, 0 aucun). Absent en boîte automatique. */
+  advisedShift?: -1 | 0 | 1;
+  /** Moteur calé (boîte manuelle) : plus de couple tant qu'il n'est pas redémarré. */
+  stalled?: boolean;
 }
 
 export interface VehicleSnapshot {

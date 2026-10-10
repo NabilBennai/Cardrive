@@ -66,7 +66,11 @@ export function DrivingHUD({ maxRpm, tireOptimalC, telemetry, paused, onPause, z
 
       <section className="cluster" aria-label={`Vitesse ${kmh(telemetry.speedMps)} kilomètres par heure, rapport ${telemetry.gear < 0 ? 'arrière' : telemetry.gear}`}>
         <div className="cluster-main">
-          <div className={telemetry.gear < 0 ? 'gear reverse' : 'gear'}>{telemetry.gear < 0 ? 'R' : telemetry.gear}</div>
+          <div className={telemetry.stalled ? 'gear reverse' : telemetry.gear < 0 ? 'gear reverse' : 'gear'}>
+            {telemetry.stalled ? '×' : telemetry.gear < 0 ? 'R' : telemetry.gear}
+            {telemetry.advisedShift ? <i className={telemetry.advisedShift > 0 ? 'shift-hint up' : 'shift-hint down'} aria-label={telemetry.advisedShift > 0 ? 'Monter un rapport' : 'Rétrograder'}>{telemetry.advisedShift > 0 ? '▲' : '▼'}</i> : null}
+          </div>
+          {telemetry.stalled && <p className="limit-pill" role="status">Moteur calé · relâchez l’accélérateur</p>}
           <div className="speed"><b>{kmh(telemetry.speedMps)}</b><span>km/h</span></div>
         </div>
         <div className="rpm" role="img" aria-label={`Régime moteur ${Math.round(telemetry.engineRpm)} tours par minute`}>

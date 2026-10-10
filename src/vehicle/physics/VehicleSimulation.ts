@@ -8,6 +8,16 @@ import {
 } from './tireModel.ts';
 import { calculateSuspensionForceN, interpolateTorqueNm } from './vehicleMath.ts';
 
+/** Boîte de vitesses : automatique (défaut) ou manuelle (le joueur passe les rapports, le moteur peut caler). */
+export type Transmission = 'auto' | 'manual';
+
+/** Une rétrogradation qui porterait le moteur au-delà de ce multiple du régime maximal est refusée. */
+const OVER_REV_LIMIT = 1.02;
+/** Calage : sous cette fraction du ralenti, sous charge et hors premier rapport, le moteur cale. */
+const STALL_RPM_FRACTION = 0.5;
+/** Durée minimale (s) d'un calage avant redémarrage, accélérateur relâché. */
+const STALL_RESTART_S = 1.2;
+
 /** Aide à la conduite : contrôle de traction (coupe le couple moteur quand une roue motrice patine). */
 export type TractionControl = 'off' | 'medium' | 'full';
 
@@ -98,6 +108,12 @@ export class VehicleSimulation {
   private slipAngleReferenceSpeedMps = 0;
   private ray: InstanceType<RapierContext['rapier']['Ray']> | null = null;
   private surfaceProvider: SurfaceProvider | null = null;
+  private transmission: Transmission = 'auto';
+  private previousShiftUp = false;
+  private previousShiftDown = false;
+  private stalled = false;
+  private stalledS = 0;
+  private advisedShift: -1 | 0 | 1 = 0;
   private tractionControl: TractionControl = 'off';
   /** Facteur (0..1) appliqué au couple moteur par le contrôle de traction, lissé d'un pas à l'autre. */
   private tractionScale = 1;
@@ -180,6 +196,13 @@ export class VehicleSimulation {
     body.applyImpulseAtPoint(this.aeroImpulse, this.aeroPoint, true);
   }
 
+  setTransmission(mode: Transmission) {
+    this.transmission = mode;
+    this.previousShiftUp = false;
+    this.previousShiftDown = false;
+    if (mode === 'auto') { this.stalled = false; this.advisedShift = 0; }
+  }
+
   setTractionControl(level: TractionControl) {
     this.tractionControl = level;
     if (level === 'off') this.tractionScale = 1;
@@ -197,6 +220,8 @@ export class VehicleSimulation {
     this.steeringRad = 0;
     this.shiftRemainingS = 0;
     this.directionWaitS = 0;
+    this.stalled = false;
+    this.stalledS = 0;
     this.longitudinalAccelMps2 = 0;
     this.previousLongitudinalSpeedMps = 0;
     for (const pose of this.wheelPoses) {
@@ -256,7 +281,9 @@ export class VehicleSimulation {
     const speedRpmFor = (ratio: number) => Math.abs(longitudinalSpeed) / c.wheelRadiusM * ratio * c.finalDriveRatio * 60 / (2 * Math.PI);
     this.shiftRemainingS = Math.max(0, this.shiftRemainingS - dt);
     const speedRpm = speedRpmFor(ratioFor());
-    if (this.gear > 0 && this.shiftRemainingS === 0) {
+    if (this.transmission === 'manual') {
+      this.manualShift(input, speedRpmFor);
+    } else if (this.gear > 0 && this.shiftRemainingS === 0) {
       if (speedRpm > c.upshiftRpm && this.gear < c.gearRatios.length) {
         this.gear += 1;
         this.shiftRemainingS = c.shiftDurationS;
@@ -276,7 +303,8 @@ export class VehicleSimulation {
     let drivenOmegaSum = 0;
     for (let i = 0; i < c.wheelMounts.length; i += 1) if (c.wheelMounts[i].driven) drivenOmegaSum += Math.abs(this.wheelPoses[i].omegaRadPerS);
     const wheelCoupledRpm = (drivenOmegaSum / Math.max(1, this.drivenWheelCount)) * overallRatio * 60 / (2 * Math.PI);
-    const targetRpm = clamp(Math.max(wheelCoupledRpm, c.idleRpm + driveInput * (c.launchRpm - c.idleRpm)), c.idleRpm, c.maximumRpm);
+    this.updateStall(driveInput, wheelCoupledRpm, dt);
+    const targetRpm = this.stalled ? 0 : clamp(Math.max(wheelCoupledRpm, c.idleRpm + driveInput * (c.launchRpm - c.idleRpm)), c.idleRpm, c.maximumRpm);
     this.rpm += (targetRpm - this.rpm) * (1 - Math.exp(-c.engineResponsePerS * dt));
     const torque = interpolateTorqueNm(this.rpm, c.torqueCurve);
     // Le limiteur de marche arrière regarde la plus grande des vitesses (véhicule, surface des roues motrices) : les roues
@@ -287,7 +315,7 @@ export class VehicleSimulation {
     const clutchEngaged = this.shiftRemainingS === 0;
     // Couple moteur ramené aux roues, réparti à parts égales entre les roues motrices (différentiel ouvert).
     const tractionScale = this.updateTractionControl(driveInput, direction);
-    const driveWheelTorqueNm = driveAllowed && clutchEngaged && wheelCoupledRpm < c.maximumRpm
+    const driveWheelTorqueNm = driveAllowed && clutchEngaged && !this.stalled && wheelCoupledRpm < c.maximumRpm
       ? torque * overallRatio * c.drivetrainEfficiency * driveInput * direction * reverseLimiter * tractionScale : 0;
     const engineBrakeWheelTorqueNm = c.engineBrakeTorqueNm * overallRatio * (1 - driveInput);
     // Inertie du moteur ramenée à chaque roue motrice (embrayage fermé) : c'est elle qui limite la vitesse de montée en régime.
@@ -465,6 +493,53 @@ export class VehicleSimulation {
       throttle: driveAllowed ? driveInput : 0, brake: brakeInput, steering: this.steeringRad / c.maxSteeringRad,
       tireTemperaturesC: this.wheelPoses.map((pose) => pose.temperatureC),
       positionM: { xM: this.position.x, zM: this.position.z },
-      headingRad: Math.atan2(this.forward.x, this.forward.z) };
+      headingRad: Math.atan2(this.forward.x, this.forward.z),
+      ...(this.transmission === 'manual' ? { advisedShift: this.advisedShift, stalled: this.stalled } : {}) };
+  }
+
+  /**
+   * Boîte manuelle : un changement par appui, qui coupe le couple le temps du passage. Monter est toujours permis ; rétrograder est
+   * refusé si le moteur dépasserait son régime maximal. Calcule aussi le rapport conseillé pour l'affichage.
+   */
+  private manualShift(input: VehicleInput, speedRpmFor: (ratio: number) => number) {
+    const c = this.config;
+    const up = Boolean(input.shiftUp);
+    const down = Boolean(input.shiftDown);
+    if (this.gear > 0 && this.shiftRemainingS === 0 && !this.stalled) {
+      if (up && !this.previousShiftUp && this.gear < c.gearRatios.length) {
+        this.gear += 1;
+        this.shiftRemainingS = c.shiftDurationS;
+      } else if (down && !this.previousShiftDown && this.gear > 1 && speedRpmFor(c.gearRatios[this.gear - 2]) * 1 <= c.maximumRpm * OVER_REV_LIMIT) {
+        this.gear -= 1;
+        this.shiftRemainingS = c.shiftDurationS;
+      }
+    }
+    this.previousShiftUp = up;
+    this.previousShiftDown = down;
+    const rpm = this.gear > 0 ? speedRpmFor(c.gearRatios[this.gear - 1]) : 0;
+    if (this.gear > 0 && rpm > c.upshiftRpm && this.gear < c.gearRatios.length) this.advisedShift = 1;
+    else if (this.gear > 1 && rpm < c.downshiftRpm && speedRpmFor(c.gearRatios[this.gear - 2]) < c.upshiftRpm * 0.9) this.advisedShift = -1;
+    else this.advisedShift = 0;
+  }
+
+  /**
+   * Calage (boîte manuelle seulement) : sous charge, hors premier rapport, avec un régime des roues sous la moitié du ralenti.
+   * Le moteur ne redémarre qu'accélérateur relâché, après STALL_RESTART_S, et on repart alors en première.
+   */
+  private updateStall(driveInput: number, wheelCoupledRpm: number, dt: number) {
+    if (this.transmission !== 'manual') return;
+    if (!this.stalled) {
+      if (this.gear >= 2 && driveInput > 0.05 && wheelCoupledRpm < this.config.idleRpm * STALL_RPM_FRACTION) {
+        this.stalled = true;
+        this.stalledS = 0;
+      }
+      return;
+    }
+    this.stalledS += dt;
+    if (this.stalledS >= STALL_RESTART_S && driveInput < 0.05) {
+      this.stalled = false;
+      this.gear = 1;
+      this.rpm = this.config.idleRpm;
+    }
   }
 }

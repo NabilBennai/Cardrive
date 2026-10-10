@@ -1,12 +1,14 @@
-import type { TractionControl } from './physics/VehicleSimulation.ts';
+import type { TractionControl, Transmission } from './physics/VehicleSimulation.ts';
 
 /** Aides à la conduite du joueur (jamais imposées aux adversaires, qui ont leur propre pilotage). */
 export interface AssistSettings {
   tractionControl: TractionControl;
+  transmission: Transmission;
 }
 
-export const DEFAULT_ASSISTS: AssistSettings = { tractionControl: 'medium' };
+export const DEFAULT_ASSISTS: AssistSettings = { tractionControl: 'medium', transmission: 'auto' };
 export const ASSISTS_KEY = 'cardrive.assists';
+export const TRANSMISSION_LABELS: Record<Transmission, string> = { auto: 'Automatique', manual: 'Manuelle' };
 export const TRACTION_LABELS: Record<TractionControl, string> = { off: 'Aucune', medium: 'Moyenne', full: 'Complète' };
 
 interface Storage { getItem(key: string): string | null; setItem(key: string, value: string): void }
@@ -14,7 +16,11 @@ interface Storage { getItem(key: string): string | null; setItem(key: string, va
 export function sanitizeAssists(value: unknown): AssistSettings {
   const candidate = (typeof value === 'object' && value !== null ? value : {}) as Partial<AssistSettings>;
   const level = candidate.tractionControl;
-  return { tractionControl: level === 'off' || level === 'medium' || level === 'full' ? level : DEFAULT_ASSISTS.tractionControl };
+  const transmission = candidate.transmission;
+  return {
+    tractionControl: level === 'off' || level === 'medium' || level === 'full' ? level : DEFAULT_ASSISTS.tractionControl,
+    transmission: transmission === 'auto' || transmission === 'manual' ? transmission : DEFAULT_ASSISTS.transmission,
+  };
 }
 
 const browserStorage = (): Storage | null => {

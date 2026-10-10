@@ -533,6 +533,38 @@ try {
     assertNoProblems(page, 'pause');
   });
 
+  await scenario('Boîte manuelle : le rapport est tenu, E et C changent de rapport', async () => {
+    try {
+      await home(page);
+      await page.click('Jouer');
+      await page.waitFor("document.querySelector('.hud-layer')", 'le tableau de bord', 60_000);
+      await sleep(800);
+      await page.tap('Escape', 'Escape');
+      await page.waitFor("document.querySelector('.pause-panel')", 'le panneau de pause');
+      if (!(await page.click('Manuelle'))) throw new Error('Choix « Manuelle » introuvable.');
+      if (!(await page.click('Reprendre'))) throw new Error('Bouton « Reprendre » introuvable.');
+      await page.waitFor("!document.querySelector('.pause-panel')", 'la fermeture de la pause');
+      const gear = async () => Number.parseInt(await page.eval("document.querySelector('.gear')?.textContent ?? ''"), 10);
+      await page.key('keyDown', 'KeyW', 'w');
+      await sleep(2_500);
+      const held = await gear();
+      if (held !== 1) throw new Error(`En boîte manuelle, le rapport devait rester en 1re (rapport ${held}).`);
+      await page.tap('KeyE', 'e');
+      await sleep(600);
+      const up = await gear();
+      if (up !== 2) throw new Error(`E devait passer la 2e (rapport ${up}, texte « ${await page.eval("document.querySelector(\".cluster\")?.textContent ?? \"\"")} »).`);
+      await page.tap('KeyC', 'c');
+      await sleep(600);
+      const down = await gear();
+      await page.key('keyUp', 'KeyW', 'w');
+      if (down !== 1) throw new Error(`C devait revenir en 1re (rapport ${down}).`);
+      assertNoProblems(page, 'manuelle');
+      return 'rapport tenu en 1re, E → 2e, C → 1re';
+    } finally {
+      await page.eval("localStorage.removeItem('cardrive.assists')");
+    }
+  });
+
   await scenario("Choix d'un véhicule (Camion) et conduite à Singapour", async () => {
     await home(page);
     await page.click('Garage');

@@ -37,6 +37,8 @@ export function useDrivingInput(
         brake: reverse ? 1 : 0,
         steering: Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyQ') || keys.has('KeyA') || keys.has('ArrowLeft')),
         handbrake: keys.has('Space') ? 1 : 0,
+        shiftUp: keys.has('KeyE') || keys.has('PageUp'),
+        shiftDown: keys.has('KeyC') || keys.has('PageDown'),
       };
     };
 
@@ -53,7 +55,7 @@ export function useDrivingInput(
         clear();
         onRespawn();
       }
-      const drivingKeys = ['KeyZ', 'KeyW', 'KeyS', 'KeyQ', 'KeyA', 'KeyD', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      const drivingKeys = ['KeyZ', 'KeyW', 'KeyS', 'KeyQ', 'KeyA', 'KeyD', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyC', 'PageUp', 'PageDown'];
       if (drivingKeys.includes(event.code)) {
         event.preventDefault();
         keyStates.current.add(event.code);

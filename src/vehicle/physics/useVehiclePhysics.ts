@@ -4,7 +4,7 @@ import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared
 import { perfStats } from '../../debug/perfStats';
 import { markPhysicsStep } from './stepClock';
 import type { SurfaceProvider } from './surfaces';
-import { VehicleSimulation, type TractionControl, type WheelPose } from './VehicleSimulation';
+import { VehicleSimulation, type TractionControl, type Transmission, type WheelPose } from './VehicleSimulation';
 
 export type { WheelPose } from './VehicleSimulation';
 
@@ -30,9 +30,11 @@ export interface VehiclePhysicsOptions {
   surfaceAt?: SurfaceProvider;
   /** Contrôle de traction ; absent : désactivé. */
   tractionControl?: TractionControl;
+  /** Boîte de vitesses ; absent : automatique. */
+  transmission?: Transmission;
 }
 
-export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true, surfaceAt, tractionControl = 'off' }: VehiclePhysicsOptions) {
+export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true, surfaceAt, tractionControl = 'off', transmission = 'auto' }: VehiclePhysicsOptions) {
   const { rapier } = useRapier();
   const simulation = useMemo(() => new VehicleSimulation(config), [config]);
   const telemetryDelay = useRef(0);
@@ -42,6 +44,7 @@ export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelP
   useLayoutEffect(() => { afterStepCallback.current = onAfterStep; }, [onAfterStep]);
   useLayoutEffect(() => { simulation.setSurfaceProvider(surfaceAt ?? null); }, [simulation, surfaceAt]);
   useLayoutEffect(() => { simulation.setTractionControl(tractionControl); }, [simulation, tractionControl]);
+  useLayoutEffect(() => { simulation.setTransmission(transmission); }, [simulation, transmission]);
   useLayoutEffect(() => {
     simulation.reset();
     wheelPosesRef.current = simulation.wheelPoses;

@@ -15,7 +15,7 @@ import { OpponentCar, type OpponentSpec } from '../race/OpponentCar';
 import { PlayerAutopilot } from '../race/PlayerAutopilot';
 import { RaceDirector, type RaceState } from '../race/RaceDirector';
 import { TireEffects } from '../feel/TireEffects';
-import type { TractionControl, WheelPose } from '../vehicle/physics/VehicleSimulation';
+import type { TractionControl, Transmission, WheelPose } from '../vehicle/physics/VehicleSimulation';
 import { FollowingSun } from './FollowingSun';
 import { CircuitScene } from '../circuits/CircuitScene';
 import type { CircuitTrack } from '../circuits/circuitGeometry';
@@ -62,6 +62,8 @@ interface DrivingSceneProps {
   };
   /** Contrôle de traction du joueur (aide à la conduite). */
   tractionControl?: TractionControl;
+  /** Boîte de vitesses du joueur (automatique par défaut). */
+  transmission?: Transmission;
   /** Crochet de test (`?autopilot`) : le pilote automatique conduit la voiture du joueur sur un circuit. */
   autopilot?: boolean;
   /** Course contre des adversaires pilotés par l'IA (circuits uniquement). */
@@ -75,7 +77,7 @@ interface DrivingSceneProps {
 }
 
 export function DrivingScene({
-  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot, tractionControl,
+  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot, tractionControl, transmission,
 }: DrivingSceneProps) {
   // Poses de roues du solveur, partagées avec les effets de pneus (fumée, traces).
   const wheelPosesRef = useRef<WheelPose[] | null>(null);
@@ -144,6 +146,7 @@ export function DrivingScene({
             respawnPoseRef={field ? playerRespawnPoseRef : undefined}
             surfaceAt={playerSurface}
             tractionControl={tractionControl}
+            transmission={transmission}
           />
           <FloatingOriginApplier origin={floatingOrigin} />
           <ChaseCamera bodyRef={bodyRef} snapVersion={respawnVersion} effects={cameraEffects} />
