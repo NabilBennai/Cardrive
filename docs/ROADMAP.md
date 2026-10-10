@@ -226,8 +226,13 @@ Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout :
 - Vérifié : freinage depuis 80 m/s au moins 20 % plus court avec déportance, inchangé à 20 m/s (tests) ; tours complets valides.
 - **Absent : le sillage** derrière une autre voiture (réduction de traînée), qui demande de connaître les positions des adversaires depuis le solveur.
 
-### R-3.5 Usure des pneus et carburant — M/L ⬜
-- Usure en fonction du travail de glissement déjà calculé (`slidingPowerW`), qui réduit le grip ; carburant qui allège la voiture pendant la course et fixe l’autonomie. Stratégie : arrêt aux stands (R-2.x futur).
+### R-3.5 Usure des pneus et carburant ✅ (joueur seulement)
+- **Usure** : chaque pneu accumule l'énergie de frottement au contact (puissance de glissement × durée, majorée jusqu'à +100 % quand la bande dépasse l'optimum de 60 °C) ; un pneu complètement usé perd 40 % d'adhérence (perte progressive : la première moitié de la vie coûte moins que la seconde). Énergie d'usure complète par profil (≈ 0,007 MJ par kg, 20-22 MJ pour les monoplaces).
+- **Carburant** : consommation = puissance mécanique du moteur × 0,27 kg/kWh (plancher de 1,5 kW au ralenti) ; réservoir par profil (4 % de la masse, 100 kg pour la monoplace thermique, 0 pour l'électrique). La masse du collider diminue en brûlant du carburant (la voiture s'allège réellement) ; panne sèche = plus de couple.
+- Étalonnage mesuré avec le pilote automatique, sur un tour de Monaco : berline sport **4 % d'usure par tour (≈ 25 tours pour user complètement les pneus)** et 1,3 kg de carburant par tour ; monoplace thermique 4,5 % par tour à Suzuka et 2,8 kg ; kart 1,8 % ; camion 2,7 %. Un tour de Monaco en voiture de sport consomme environ 54 L / 100 km (conduite sur circuit, pleine charge ≈ 60 % du temps).
+- **Interface** : réglage « Usure et carburant : Désactivés / Activés » dans le menu pause (**activés par défaut**, mémorisé), bouton « Pneus neufs et plein », usure par pneu et carburant dans les détails (T), messages « Carburant bas » et « Panne sèche ».
+- Vérifié : 8 tests (modèle pur, consommation et masse du collider, pneus usés freinant ≥ 15 % plus loin, remise à neuf, panne sèche, désactivé par défaut) ; e2e dans le navigateur (détails et bouton).
+- **Limites** : les adversaires ne s'usent pas et ne consomment pas ; pas d'arrêt au stand dans la course (le bouton de pause tient lieu de ravitaillement) ; l'usure ne dépend pas encore de la surface (R-3.1) ni de la météo ; voiture électrique : pas de batterie modélisée.
 
 ### R-3.6 Météo et état de la piste — L ⬜
 - Pluie : réduction du grip (facteur global puis par zone mouillée), aquaplanage au-delà d’une vitesse dépendant de la hauteur d’eau, séchage de la trajectoire. Température de l’air et de la piste influençant l’échauffement des pneus (le paramètre `ambientTemperatureC` existe déjà).

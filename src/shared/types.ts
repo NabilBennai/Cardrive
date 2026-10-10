@@ -23,6 +23,10 @@ export interface VehicleTelemetry {
   positionM: { xM: number; zM: number };
   headingRad: number;
   /** Boîte manuelle : rapport conseillé (+1 monter, -1 rétrograder, 0 aucun). Absent en boîte automatique. */
+  /** Usure de chaque pneu (0 neuf … 1 lisse) et carburant restant (kg) ; présents seulement si l'usure est activée. */
+  tireWear?: number[];
+  fuelKg?: number;
+  fuelCapacityKg?: number;
   advisedShift?: -1 | 0 | 1;
   /** Moteur calé (boîte manuelle) : plus de couple tant qu'il n'est pas redémarré. */
   stalled?: boolean;
@@ -136,4 +140,8 @@ export interface VehicleConfig {
   downforceFrontShare: number;
   /** Verrouillage du différentiel de chaque essieu moteur : 0 = ouvert, 1 = bloqué (couple reporté sur la roue la plus lente). */
   differentialLock: number;
+  /** Énergie de frottement (MJ) qui use complètement un pneu. */
+  tireWearEnergyMJ: number;
+  /** Réservoir plein (kg de carburant) ; 0 pour un véhicule sans carburant (électrique). Fait partie de massKg. */
+  fuelCapacityKg: number;
 }

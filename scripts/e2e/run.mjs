@@ -565,6 +565,27 @@ try {
     }
   });
 
+  await scenario('Usure des pneus et carburant : affichés dans les détails, remise à neuf depuis la pause', async () => {
+    await home(page);
+    await page.click('Jouer');
+    await page.waitFor("document.querySelector('.hud-layer')", 'le tableau de bord', 60_000);
+    await sleep(800);
+    await page.key('keyDown', 'KeyW', 'w');
+    await sleep(3_000);
+    await page.key('keyUp', 'KeyW', 'w');
+    await page.tap('KeyT', 't');
+    await page.waitFor("document.querySelector('.details-panel')", 'les détails du véhicule');
+    const details = await page.eval("document.querySelector('.details-panel')?.textContent ?? ''");
+    if (!/Carburant\d+%·\d+kg/.test(details.replace(/[\s\u202f\u00a0]/g, ''))) throw new Error(`Carburant absent des détails (« ${details} »).`);
+    if (!/usure \d+ %/.test(details)) throw new Error(`Usure des pneus absente des détails (« ${details} »).`);
+    await page.tap('Escape', 'Escape');
+    await page.waitFor("document.querySelector('.pause-panel')", 'le panneau de pause');
+    if (!(await page.click('Pneus neufs et plein'))) throw new Error('Bouton « Pneus neufs et plein » introuvable.');
+    await page.waitFor("!document.querySelector('.pause-panel')", 'la reprise après l\'arrêt au stand');
+    assertNoProblems(page, 'usure');
+    return details.replace(/\s+/g, ' ').slice(0, 120);
+  });
+
   await scenario("Choix d'un véhicule (Camion) et conduite à Singapour", async () => {
     await home(page);
     await page.click('Garage');

@@ -4,9 +4,11 @@ import type { TractionControl, Transmission } from './physics/VehicleSimulation.
 export interface AssistSettings {
   tractionControl: TractionControl;
   transmission: Transmission;
+  /** Usure des pneus et consommation de carburant. */
+  wearAndFuel: boolean;
 }
 
-export const DEFAULT_ASSISTS: AssistSettings = { tractionControl: 'medium', transmission: 'auto' };
+export const DEFAULT_ASSISTS: AssistSettings = { tractionControl: 'medium', transmission: 'auto', wearAndFuel: true };
 export const ASSISTS_KEY = 'cardrive.assists';
 export const TRANSMISSION_LABELS: Record<Transmission, string> = { auto: 'Automatique', manual: 'Manuelle' };
 export const TRACTION_LABELS: Record<TractionControl, string> = { off: 'Aucune', medium: 'Moyenne', full: 'Complète' };
@@ -20,6 +22,7 @@ export function sanitizeAssists(value: unknown): AssistSettings {
   return {
     tractionControl: level === 'off' || level === 'medium' || level === 'full' ? level : DEFAULT_ASSISTS.tractionControl,
     transmission: transmission === 'auto' || transmission === 'manual' ? transmission : DEFAULT_ASSISTS.transmission,
+    wearAndFuel: typeof candidate.wearAndFuel === 'boolean' ? candidate.wearAndFuel : DEFAULT_ASSISTS.wearAndFuel,
   };
 }
 

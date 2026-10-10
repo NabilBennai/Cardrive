@@ -254,3 +254,5 @@ kbd { display: inline-grid; min-width: 24px; height: 24px; padding: 0 7px; place
 .shift-hint.down { bottom: 4px; }
 
 .flip-pill { position: absolute; left: 50%; bottom: 120px; z-index: 4; transform: translateX(-50%); }
+
+.fuel-pill { bottom: calc(var(--gutter) + 90px); }

@@ -54,11 +54,17 @@ export interface VehicleProfile {
   downforceFrontShare: number;
   /** Verrouillage du différentiel (0 = ouvert, 1 = bloqué). */
   differentialLock: number;
+  /** Énergie de frottement (MJ) qui use un pneu ; par défaut proportionnelle à la masse. */
+  tireWearEnergyMJ?: number;
+  /** Réservoir plein (kg) ; par défaut 4 % de la masse ; 0 = électrique. */
+  fuelCapacityKg?: number;
 }
 
 /** Puissance du moteur du prototype (kW) autour de 6 000 tr/min : base de calcul de l'échelle de couple. */
 const BASE_POWER_KW = 88;
 const GRAVITY = 9.81;
+/** Énergie de frottement (MJ) par kg de masse qui use complètement un pneu (à étalonner d'après les mesures de conduite). */
+const WEAR_MJ_PER_KG = 0.007;
 /** Rapport de la dernière vitesse (boîte seule) : la démultiplication finale est déduite de la vitesse de pointe visée. */
 const TOP_GEAR_RATIO = 0.8;
 /** Vitesse au régime MAXIMAL en dernier rapport / vitesse de pointe visée (le rapport de coupure est à 6 400 tr/min pour 6 700 tr/min maximum, donc 0,96 ≈ 1 au régime maximal) : la démultiplication fixe la vitesse de pointe, comme une voiture bridée ; un véhicule moins puissant reste limité par la traînée en dessous. */
@@ -150,6 +156,8 @@ export function deriveVehicleConfig(id: string, displayName: string, p: VehicleP
     downforceClAM2: p.downforceClAM2,
     downforceFrontShare: p.downforceFrontShare,
     differentialLock: p.differentialLock,
+    tireWearEnergyMJ: p.tireWearEnergyMJ ?? p.massKg * WEAR_MJ_PER_KG,
+    fuelCapacityKg: p.fuelCapacityKg ?? Math.round(p.massKg * 0.04),
   });
 }
 
@@ -239,13 +247,13 @@ const PROFILES: Record<string, VehicleProfile> = {
   race: profile({
     massKg: 800, lengthM: 4.5, widthM: 1.95, heightM: 1.05, wheelbaseM: 3.0, trackWidthM: 1.7,
     powerKw: 650, topSpeedKmh: 340, firstGearOverall: 12, gears: 7, dragCoefficient: 0.6, frontalAreaM2: 1.4, drive: 'rwd',
-    differentialLock: 0.2, tireGrip: 1.35, brakeG: 1.9, stiffness: 2.0, cogHeightFraction: 0.27, downforceClAM2: 2.8, downforceFrontShare: 0.42, rpmScale: 1.7, shiftDurationS: 0.1, maxSteeringRad: 0.42, steeringRateRadPerS: 2.2,
+    differentialLock: 0.2, fuelCapacityKg: 100, tireWearEnergyMJ: 20, tireGrip: 1.35, brakeG: 1.9, stiffness: 2.0, cogHeightFraction: 0.27, downforceClAM2: 2.8, downforceFrontShare: 0.42, rpmScale: 1.7, shiftDurationS: 0.1, maxSteeringRad: 0.42, steeringRateRadPerS: 2.2,
     wheelRadiusM: 0.33, suspensionScale: 0.6, tirePeakSlipAngleRad: 0.1, tireSlidingGripRatio: 0.88, tireOptimalTemperatureC: 95, tireLoadSensitivity: 0.1,
   }),
   'race-future': profile({
     massKg: 900, lengthM: 4.5, widthM: 1.95, heightM: 1.1, wheelbaseM: 3.0, trackWidthM: 1.7,
     powerKw: 700, topSpeedKmh: 380, firstGearOverall: 11.5, gears: 7, dragCoefficient: 0.5, frontalAreaM2: 1.4, drive: 'awd',
-    differentialLock: 0.2, tireGrip: 1.4, brakeG: 2.1, stiffness: 2.2, cogHeightFraction: 0.26, downforceClAM2: 3.0, downforceFrontShare: 0.42, rpmScale: 1.5, shiftDurationS: 0.08, maxSteeringRad: 0.42, steeringRateRadPerS: 2.4,
+    differentialLock: 0.2, fuelCapacityKg: 0, tireWearEnergyMJ: 22, tireGrip: 1.4, brakeG: 2.1, stiffness: 2.2, cogHeightFraction: 0.26, downforceClAM2: 3.0, downforceFrontShare: 0.42, rpmScale: 1.5, shiftDurationS: 0.08, maxSteeringRad: 0.42, steeringRateRadPerS: 2.4,
     wheelRadiusM: 0.33, suspensionScale: 0.6, tirePeakSlipAngleRad: 0.1, tireSlidingGripRatio: 0.88, tireOptimalTemperatureC: 95, tireLoadSensitivity: 0.1,
   }),
   delivery: profile({

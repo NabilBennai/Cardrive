@@ -80,6 +80,7 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
     || config.drivetrainEfficiency > 1
     || config.downforceFrontShare < 0 || config.downforceFrontShare > 1
     || !(config.differentialLock >= 0 && config.differentialLock <= 1)
+    || !(config.tireWearEnergyMJ > 0) || !(config.fuelCapacityKg >= 0) || config.fuelCapacityKg >= config.massKg * 0.5
     || config.downshiftRpm <= config.idleRpm || config.downshiftRpm >= config.upshiftRpm
     || config.upshiftRpm >= config.maximumRpm || config.launchRpm < config.idleRpm || config.launchRpm >= config.upshiftRpm
     || config.minimumSuspensionLengthM >= config.suspensionRestLengthM) {
@@ -183,6 +184,8 @@ const genericVehicleDefinition: VehicleConfig = {
   downforceClAM2: 0,
   downforceFrontShare: 0.45,
   differentialLock: 0,
+  tireWearEnergyMJ: 8,
+  fuelCapacityKg: 45,
 };
 
 export const genericVehicle = validateVehicleConfig(genericVehicleDefinition);

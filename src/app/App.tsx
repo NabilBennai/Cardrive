@@ -115,6 +115,14 @@ export function App() {
     });
   }, []);
   const [flipped, setFlipped] = useState(false);
+  const chooseWear = useCallback((wearAndFuel: boolean) => {
+    setAssists((current) => {
+      const next = { ...current, wearAndFuel };
+      saveAssists(next);
+      return next;
+    });
+  }, []);
+  const [serviceVersion, setServiceVersion] = useState(0);
   const [showCarPicker, setShowCarPicker] = useState(false);
   const [showCircuitPicker, setShowCircuitPicker] = useState(false);
   const [circuitTrack, setCircuitTrack] = useState<CircuitTrack | null>(null);
@@ -312,6 +320,8 @@ export function App() {
               autopilot={autopilotRequested}
               tractionControl={assists.tractionControl}
               transmission={isTouchDevice ? 'auto' : assists.transmission}
+              wearEnabled={assists.wearAndFuel}
+              serviceVersion={serviceVersion}
               onFlippedChange={setFlipped}
               onAutoRecover={respawn}
             />
@@ -426,6 +436,14 @@ export function App() {
                   ))}
                 </div>
               </div>
+              <div className="setup-row">
+                <span>Usure et carburant</span>
+                <div className="segmented" role="group" aria-label="Usure et carburant">
+                  <button aria-pressed={!assists.wearAndFuel} onClick={() => chooseWear(false)}>Désactivés</button>
+                  <button aria-pressed={assists.wearAndFuel} onClick={() => chooseWear(true)}>Activés</button>
+                </div>
+              </div>
+              {assists.wearAndFuel && <button className="btn-quiet" onClick={() => { setServiceVersion((value) => value + 1); resumeGame(); }}>Pneus neufs et plein</button>}
             </fieldset>
             <AudioSettingsPanel settings={audioSettings} onChange={updateAudioSettings} />
             <dl className="controls-list">

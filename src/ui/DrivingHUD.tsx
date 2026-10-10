@@ -29,6 +29,7 @@ export function DrivingHUD({ maxRpm, tireOptimalC, telemetry, paused, onPause, z
   const [showDetails, setShowDetails] = useState(false);
   const rpmShare = Math.min(1, telemetry.engineRpm / maxRpm);
   const gripLimit = telemetry.slip > GRIP_LIMIT_SLIP;
+  const fuelShare = telemetry.fuelKg !== undefined && telemetry.fuelCapacityKg ? telemetry.fuelKg / telemetry.fuelCapacityKg : 1;
   const gripUsedPercent = Math.min(100, Math.round(telemetry.slip * 100));
 
   useEffect(() => {
@@ -51,11 +52,14 @@ export function DrivingHUD({ maxRpm, tireOptimalC, telemetry, paused, onPause, z
           <div className="detail-row"><span>Régime</span><b>{Math.round(telemetry.engineRpm).toLocaleString('fr-FR')} tr/min</b></div>
           <div className="detail-row"><span>Adhérence</span><b className={gripLimit ? 'warning' : ''}>{gripLimit ? 'Glisse' : `${gripUsedPercent} % utilisé`}</b></div>
           <div className="detail-row"><span>Roues au sol</span><b>{telemetry.groundedWheels} / 4</b></div>
+          {telemetry.fuelKg !== undefined && telemetry.fuelCapacityKg ? (
+            <div className="detail-row"><span>Carburant</span><b className={fuelShare < 0.1 ? 'warning' : ''}>{Math.round(fuelShare * 100)} % · {Math.round(telemetry.fuelKg)} kg</b></div>
+          ) : null}
           <div className="tires">
             {telemetry.tireTemperaturesC.map((tempC, index) => (
               <div key={TIRE_LABELS[index]} className="detail-row">
                 <span>{TIRE_LABELS[index]}</span>
-                <b className={tireStatus(tempC, tireOptimalC)}>{Math.round(tempC)} °C</b>
+                <b className={tireStatus(tempC, tireOptimalC)}>{Math.round(tempC)} °C{telemetry.tireWear ? ` · usure ${Math.round(telemetry.tireWear[index] * 100)} %` : ''}</b>
               </div>
             ))}
           </div>
@@ -63,6 +67,7 @@ export function DrivingHUD({ maxRpm, tireOptimalC, telemetry, paused, onPause, z
       )}
 
       {gripLimit && <p className="limit-pill" role="status">Adhérence limite</p>}
+      {fuelShare < 0.1 && telemetry.fuelCapacityKg ? <p className="limit-pill fuel-pill" role="status">{telemetry.fuelKg === 0 ? 'Panne sèche' : 'Carburant bas'}</p> : null}
 
       <section className="cluster" aria-label={`Vitesse ${kmh(telemetry.speedMps)} kilomètres par heure, rapport ${telemetry.gear < 0 ? 'arrière' : telemetry.gear}`}>
         <div className="cluster-main">

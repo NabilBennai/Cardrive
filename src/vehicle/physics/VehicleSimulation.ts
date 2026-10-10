@@ -2,10 +2,12 @@ import type { RapierContext, RapierRigidBody } from '@react-three/rapier';
 import { Quaternion, Vector3 } from 'three';
 import type { SurfaceMaterial, VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types.ts';
 import { SURFACES, type SurfaceProvider } from './surfaces.ts';
+import { fuelBurnedKg, wearGripFactor, wearIncrement } from './wearModel.ts';
 import {
   stableReferenceSpeedMps, staticWheelLoadN, stepTireThermal, temperatureGripFactor, thermalParamsFor, tireForce,
   type TireForceParams, type TireThermalParams,
 } from './tireModel.ts';
+import { vehicleColliderMassProperties } from './vehicleBody.ts';
 import { calculateSuspensionForceN, interpolateTorqueNm } from './vehicleMath.ts';
 
 /** Boîte de vitesses : automatique (défaut) ou manuelle (le joueur passe les rapports, le moteur peut caler). */
@@ -108,6 +110,12 @@ export class VehicleSimulation {
   private slipAngleReferenceSpeedMps = 0;
   private ray: InstanceType<RapierContext['rapier']['Ray']> | null = null;
   private surfaceProvider: SurfaceProvider | null = null;
+  private wearEnabled = false;
+  /** Usure de chaque pneu (0 neuf … 1 lisse). */
+  private readonly wear: number[];
+  private fuelKg: number;
+  /** Masse appliquée au collider au dernier ajustement (kg) : la voiture s'allège en brûlant du carburant. */
+  private appliedMassKg: number;
   private transmission: Transmission = 'auto';
   private previousShiftUp = false;
   private previousShiftDown = false;
@@ -139,6 +147,9 @@ export class VehicleSimulation {
       temperatureC: config.ambientTemperatureC, carcassTemperatureC: config.ambientTemperatureC,
       grounded: false, slidingPowerW: 0, contactX: 0, contactY: 0, contactZ: 0, surface: 'asphalt' as SurfaceMaterial,
     }));
+    this.wear = config.wheelMounts.map(() => 0);
+    this.fuelKg = config.fuelCapacityKg;
+    this.appliedMassKg = config.massKg;
     this.previousKappa = config.wheelMounts.map(() => 0);
     this.omegaAtStepStart = config.wheelMounts.map(() => 0);
     this.drivenAxleCount = new Set(config.wheelMounts.filter((wheel) => wheel.driven).map((wheel) => wheel.front)).size;
@@ -190,11 +201,45 @@ export class VehicleSimulation {
     return axleShare * (0.5 + 0.5 * c.differentialLock * bias);
   }
 
+  /** Brûle le carburant d'un pas et allège le collider quand la masse a changé d'au moins 0,5 kg. */
+  private burnFuel(body: RapierRigidBody, enginePowerW: number, dt: number) {
+    this.fuelKg = Math.max(0, this.fuelKg - fuelBurnedKg(enginePowerW, dt));
+    const massKg = this.config.massKg - (this.config.fuelCapacityKg - this.fuelKg);
+    if (Math.abs(massKg - this.appliedMassKg) < 0.5) return;
+    const collider = body.collider(0);
+    if (!collider) return;
+    const reference = vehicleColliderMassProperties(this.config);
+    const scale = massKg / this.config.massKg;
+    const inertia = reference.principalAngularInertia;
+    collider.setMassProperties(massKg, reference.centerOfMass, { x: inertia.x * scale, y: inertia.y * scale, z: inertia.z * scale }, reference.angularInertiaLocalFrame);
+    body.recomputeMassPropertiesFromColliders();
+    this.appliedMassKg = massKg;
+  }
+
   private applyDownforce(body: RapierRigidBody, impulseNs: number, axleZM: number) {
     this.aeroPoint.set(0, 0, axleZM).applyQuaternion(this.rotation).add(this.position);
     this.aeroImpulse.copy(this.down).multiplyScalar(impulseNs);
     body.applyImpulseAtPoint(this.aeroImpulse, this.aeroPoint, true);
   }
+
+  /** Active l'usure des pneus et la consommation de carburant (désactivées par défaut : voiture neuve, réservoir plein). */
+  setWearEnabled(enabled: boolean) {
+    this.wearEnabled = enabled;
+  }
+
+  /** Pneus neufs et réservoir plein (arrêt au stand). */
+  service() {
+    this.wear.fill(0);
+    this.fuelKg = this.config.fuelCapacityKg;
+  }
+
+  /** Ajoute de l'usure à tous les pneus (0..1), par exemple après un événement violent ; utile aussi aux tests. */
+  wearTires(amount: number) {
+    for (let i = 0; i < this.wear.length; i += 1) this.wear[i] = Math.max(0, Math.min(1, this.wear[i] + amount));
+  }
+
+  get tireWear(): readonly number[] { return this.wear; }
+  get fuelRemainingKg(): number { return this.fuelKg; }
 
   setTransmission(mode: Transmission) {
     this.transmission = mode;
@@ -315,8 +360,10 @@ export class VehicleSimulation {
     const clutchEngaged = this.shiftRemainingS === 0;
     // Couple moteur ramené aux roues, réparti à parts égales entre les roues motrices (différentiel ouvert).
     const tractionScale = this.updateTractionControl(driveInput, direction);
-    const driveWheelTorqueNm = driveAllowed && clutchEngaged && !this.stalled && wheelCoupledRpm < c.maximumRpm
+    const hasFuel = !this.wearEnabled || c.fuelCapacityKg <= 0 || this.fuelKg > 0;
+    const driveWheelTorqueNm = driveAllowed && clutchEngaged && !this.stalled && hasFuel && wheelCoupledRpm < c.maximumRpm
       ? torque * overallRatio * c.drivetrainEfficiency * driveInput * direction * reverseLimiter * tractionScale : 0;
+    if (this.wearEnabled && c.fuelCapacityKg > 0) this.burnFuel(body, torque * this.rpm * 2 * Math.PI / 60 * driveInput * (hasFuel ? 1 : 0), dt);
     const engineBrakeWheelTorqueNm = c.engineBrakeTorqueNm * overallRatio * (1 - driveInput);
     // Inertie du moteur ramenée à chaque roue motrice (embrayage fermé) : c'est elle qui limite la vitesse de montée en régime.
     const reflectedEngineInertia = clutchEngaged ? c.engineInertiaKgM2 * overallRatio * overallRatio / Math.max(1, this.drivenWheelCount) : 0;
@@ -342,6 +389,7 @@ export class VehicleSimulation {
       pending.impulse.set(0, 0, 0);
       pose.steeringRad = wheel.front ? -this.steeringRad : 0;
       let gripFactor = temperatureGripFactor(pose.temperatureC, c.tireOptimalTemperatureC, c.tireTemperatureFalloffC, c.tireMinGripMultiplier);
+      if (this.wearEnabled) gripFactor *= wearGripFactor(this.wear[index]);
       let rollingFactor = 1;
 
       this.mount.set(wheel.xM, -0.08, wheel.zM).applyQuaternion(this.rotation).add(this.position);
@@ -462,6 +510,7 @@ export class VehicleSimulation {
         pose.omegaRadPerS = applyBrake(freeOmega, dt * (serviceBrakeTorqueNm + handbrakeTorqueNm) / wheelInertia, 0);
       }
 
+      if (this.wearEnabled && inContact) this.wear[index] = Math.min(1, this.wear[index] + wearIncrement(slidingPowerW, dt, pose.temperatureC, c.tireOptimalTemperatureC, c.tireWearEnergyMJ));
       pose.spinRad -= pose.omegaRadPerS * dt;
       const thermal = stepTireThermal(
         { surfaceC: pose.temperatureC, carcassC: pose.carcassTemperatureC },
@@ -494,6 +543,7 @@ export class VehicleSimulation {
       tireTemperaturesC: this.wheelPoses.map((pose) => pose.temperatureC),
       positionM: { xM: this.position.x, zM: this.position.z },
       headingRad: Math.atan2(this.forward.x, this.forward.z),
+      ...(this.wearEnabled ? { tireWear: this.wear.slice(), fuelKg: this.fuelKg, fuelCapacityKg: c.fuelCapacityKg } : {}),
       ...(this.transmission === 'manual' ? { advisedShift: this.advisedShift, stalled: this.stalled } : {}) };
   }
 

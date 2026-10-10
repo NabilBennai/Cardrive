@@ -32,9 +32,13 @@ export interface VehiclePhysicsOptions {
   tractionControl?: TractionControl;
   /** Boîte de vitesses ; absent : automatique. */
   transmission?: Transmission;
+  /** Usure des pneus et carburant ; absent : désactivés. */
+  wearEnabled?: boolean;
+  /** Incrémenté pour changer les pneus et refaire le plein. */
+  serviceVersion?: number;
 }
 
-export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true, surfaceAt, tractionControl = 'off', transmission = 'auto' }: VehiclePhysicsOptions) {
+export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true, surfaceAt, tractionControl = 'off', transmission = 'auto', wearEnabled = false, serviceVersion = 0 }: VehiclePhysicsOptions) {
   const { rapier } = useRapier();
   const simulation = useMemo(() => new VehicleSimulation(config), [config]);
   const telemetryDelay = useRef(0);
@@ -45,6 +49,13 @@ export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelP
   useLayoutEffect(() => { simulation.setSurfaceProvider(surfaceAt ?? null); }, [simulation, surfaceAt]);
   useLayoutEffect(() => { simulation.setTractionControl(tractionControl); }, [simulation, tractionControl]);
   useLayoutEffect(() => { simulation.setTransmission(transmission); }, [simulation, transmission]);
+  useLayoutEffect(() => { simulation.setWearEnabled(wearEnabled); }, [simulation, wearEnabled]);
+  const servicedVersion = useRef(serviceVersion);
+  useLayoutEffect(() => {
+    if (servicedVersion.current === serviceVersion) return;
+    servicedVersion.current = serviceVersion;
+    simulation.service();
+  }, [simulation, serviceVersion]);
   useLayoutEffect(() => {
     simulation.reset();
     wheelPosesRef.current = simulation.wheelPoses;

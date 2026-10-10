@@ -46,6 +46,10 @@ interface GenericCarProps {
   tractionControl?: TractionControl;
   /** Boîte de vitesses du joueur ; absent : automatique. */
   transmission?: Transmission;
+  /** Usure des pneus et carburant du joueur ; absent : désactivés. */
+  wearEnabled?: boolean;
+  /** Incrémenté pour changer les pneus et refaire le plein. */
+  serviceVersion?: number;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
@@ -370,9 +374,9 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef, drivesClock, respawnPoseRef, surfaceAt, tractionControl, transmission }: GenericCarProps) {
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef, drivesClock, respawnPoseRef, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion }: GenericCarProps) {
   const wheelPosesRef = useRef(initialWheelPoses(config));
-  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep, drivesClock, surfaceAt, tractionControl, transmission });
+  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep, drivesClock, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion });
   const previousRespawnVersion = useRef(respawnVersion);
   // Après useVehiclePhysics (qui installe le tableau de poses du solveur) : on publie ce même tableau.
   useLayoutEffect(() => { if (wheelPosesOutRef) wheelPosesOutRef.current = wheelPosesRef.current; }, [wheelPosesOutRef]);
