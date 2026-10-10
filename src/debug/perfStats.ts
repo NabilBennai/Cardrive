@@ -61,6 +61,8 @@ export const perfStats = {
   vehicleSolverMs: new RollingWindow(WINDOW_FRAMES),
   /** Durée de construction d'un chunk (graphes de routes, bâtiments, eau) en ms : sur le thread principal, donc visible en saccade. */
   chunkBuildMs: new RollingWindow(WINDOW_FRAMES),
+  /** Son : état du contexte audio, fréquence du moteur, niveau de sortie. Alimenté par AudioDriver. */
+  audio: { state: 'idle', fundamentalHz: 0, engineGain: 0, squealGain: 0, levelDb: -120 } as { state: string; fundamentalHz: number; engineGain: number; squealGain: number; levelDb: number },
   /** Compteurs du monde streamé, mis à jour par useChunkStreamer et useFloatingOrigin. */
   world: { activeChunks: 0, failedChunks: 0, recenters: 0, chunkCrossings: 0, recenterJumpM: 0, steadyJumpM: 0, vehicleWorldXM: 0 },
   /** Compteurs de scène, rafraîchis périodiquement (pas à chaque image). */
@@ -105,6 +107,10 @@ export interface PerfSnapshot {
   steadyJumpM: number;
   /** Position est-ouest du véhicule (m) dans le repère MONDE (ancre du lieu choisi), indépendante des recentrages. */
   vehicleWorldXM: number;
+  audioState: string;
+  engineHz: number;
+  squealGain: number;
+  audioLevelDb: number;
   chunkBuildAverageMs: number;
   chunkBuildMaxMs: number;
 }
@@ -120,6 +126,10 @@ export function takeSnapshot(): PerfSnapshot {
     vehicleSolverAverageMs: perfStats.vehicleSolverMs.average(),
     ...perfStats.scene,
     ...perfStats.world,
+    audioState: perfStats.audio.state,
+    engineHz: perfStats.audio.fundamentalHz,
+    squealGain: perfStats.audio.squealGain,
+    audioLevelDb: perfStats.audio.levelDb,
     chunkBuildAverageMs: perfStats.chunkBuildMs.average(),
     chunkBuildMaxMs: perfStats.chunkBuildMs.max(),
   };
@@ -144,6 +154,7 @@ export function resetPerfStats() {
   perfStats.physicsStepMs.clear();
   perfStats.vehicleSolverMs.clear();
   perfStats.chunkBuildMs.clear();
+  perfStats.audio = { state: 'idle', fundamentalHz: 0, engineGain: 0, squealGain: 0, levelDb: -120 };
   perfStats.world = { activeChunks: 0, failedChunks: 0, recenters: 0, chunkCrossings: 0, recenterJumpM: 0, steadyJumpM: 0, vehicleWorldXM: 0 };
   perfStats.scene = { triangles: 0, drawCalls: 0, geometries: 0, textures: 0, colliders: 0, bodies: 0 };
 }

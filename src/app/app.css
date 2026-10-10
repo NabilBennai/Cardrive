@@ -186,3 +186,14 @@ kbd { display: inline-grid; min-width: 24px; height: 24px; padding: 0 7px; place
 .perf-row { display: flex; justify-content: space-between; gap: 18px; padding: 2px 0; }
 .perf-row span { color: var(--muted); }
 .perf-row.over-budget b { color: var(--danger); }
+
+/* ---------- Réglages son et ressenti (menu pause) ---------- */
+.settings-group { margin: 22px 0 0; padding: 14px 0 0; border: 0; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.settings-group legend { padding: 0; margin-bottom: 4px; color: var(--muted); font-size: 13px; font-weight: 500; }
+.slider-row { display: grid; grid-template-columns: 1fr 120px 28px; align-items: center; gap: 12px; font-size: 14px; }
+.slider-row span { color: var(--text); }
+.slider-row output { color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.slider-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.slider-row input:disabled { opacity: .4; }
+.check-row { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
+.check-row input { width: 16px; height: 16px; accent-color: var(--accent); }

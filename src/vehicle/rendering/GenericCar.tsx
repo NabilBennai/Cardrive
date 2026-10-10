@@ -32,6 +32,8 @@ interface GenericCarProps {
   modelUrl?: string | null;
   /** Configuration physique ; absente : prototype calibré (genericVehicle). */
   config?: VehicleConfig;
+  /** Reçoit les poses de roues du solveur (fumée, traces de pneus) : même tableau que celui qui anime les roues. */
+  wheelPosesOutRef?: React.RefObject<WheelPose[] | null>;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
@@ -125,6 +127,11 @@ const initialWheelPoses = (config: VehicleConfig): WheelPose[] => config.wheelMo
   omegaRadPerS: 0,
   temperatureC: config.ambientTemperatureC,
   carcassTemperatureC: config.ambientTemperatureC,
+  grounded: false,
+  slidingPowerW: 0,
+  contactX: 0,
+  contactY: 0,
+  contactZ: 0,
 }));
 
 /** Roue à jante aluminium 5 branches : pneu, disque de frein, jante, branches et écrous. */
@@ -350,10 +357,12 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle }: GenericCarProps) {
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef }: GenericCarProps) {
   const wheelPosesRef = useRef(initialWheelPoses(config));
   const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep });
   const previousRespawnVersion = useRef(respawnVersion);
+  // Après useVehiclePhysics (qui installe le tableau de poses du solveur) : on publie ce même tableau.
+  useLayoutEffect(() => { if (wheelPosesOutRef) wheelPosesOutRef.current = wheelPosesRef.current; }, [wheelPosesOutRef]);
   const visualRef = useRef<Group>(null);
   const extrapolation = useRef({ offset: new Vector3(), bodyRotation: new Quaternion(), inverse: new Quaternion(), delta: new Quaternion(), axis: new Vector3() });
 

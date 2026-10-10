@@ -32,7 +32,7 @@ describe('budgetViolations', () => {
   const healthy: PerfSnapshot = {
     fps: 60, frameAverageMs: 16.6, framePercentile95Ms: 17.5, physicsStepAverageMs: 0.6, physicsStepMaxMs: 1.4, vehicleSolverAverageMs: 0.1,
     triangles: 400_000, drawCalls: 120, geometries: 200, textures: 20, colliders: 300, bodies: 40,
-    activeChunks: 25, failedChunks: 0, recenters: 0, chunkCrossings: 0, recenterJumpM: 0, steadyJumpM: 0.2, vehicleWorldXM: 1200, chunkBuildAverageMs: 6, chunkBuildMaxMs: 12,
+    activeChunks: 25, failedChunks: 0, recenters: 0, chunkCrossings: 0, recenterJumpM: 0, steadyJumpM: 0.2, vehicleWorldXM: 1200, audioState: 'running', engineHz: 120, squealGain: 0, audioLevelDb: -30, chunkBuildAverageMs: 6, chunkBuildMaxMs: 12,
   };
 
   it('reports nothing for a scene within budget', () => {

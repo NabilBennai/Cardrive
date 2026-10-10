@@ -19,6 +19,9 @@ import type { DrivingWorld } from './DrivingScene';
 import { Minimap } from '../ui/Minimap';
 import { CircuitMinimap } from '../ui/CircuitMinimap';
 import { PerfOverlay } from '../debug/PerfOverlay';
+import { AudioSettingsPanel } from '../audio/AudioSettingsPanel';
+import { loadAudioSettings, saveAudioSettings, type AudioSettings } from '../audio/audioSettings';
+import { getGameAudio } from '../audio/GameAudio';
 
 const isTouchDevice = typeof window !== 'undefined' && (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
 
@@ -78,6 +81,14 @@ export function App() {
   // Étape 3 : choix du lieu, chargement OSM/Overpass, piste de démo toujours disponible hors ligne.
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [showPerf, setShowPerf] = useState(false);
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>(loadAudioSettings);
+  const updateAudioSettings = useCallback((patch: Partial<AudioSettings>) => {
+    setAudioSettings((current) => {
+      const next = { ...current, ...patch };
+      saveAudioSettings(next);
+      return next;
+    });
+  }, []);
   const [showCarPicker, setShowCarPicker] = useState(false);
   const [showCircuitPicker, setShowCircuitPicker] = useState(false);
   const [circuitTrack, setCircuitTrack] = useState<CircuitTrack | null>(null);
@@ -163,8 +174,17 @@ export function App() {
     requestAnimationFrame(() => gameFocus.current?.focus());
   }, []);
 
+  // Le son ne peut démarrer qu'après un geste de l'utilisateur : on se branche sur le tout premier, quel qu'il soit.
+  useEffect(() => { getGameAudio().unlockOnFirstGesture(); }, []);
+  useEffect(() => { getGameAudio().setSettings(audioSettings); }, [audioSettings]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.code === 'KeyM' && !event.repeat && !(event.target instanceof HTMLInputElement)) setAudioSettings((current) => {
+        const next = { ...current, muted: !current.muted };
+        saveAudioSettings(next);
+        return next;
+      });
       if (event.code === 'F3' && !event.repeat) { event.preventDefault(); setShowPerf((value) => !value); }
     };
     window.addEventListener('keydown', onKey);
@@ -212,6 +232,8 @@ export function App() {
               onZoneUnavailable={setZoneUnavailable}
               carModelUrl={carModelUrl(selectedCar)}
               vehicle={vehicleConfig}
+              carId={selectedCarId === 'prototype' ? null : selectedCarId}
+              cameraEffects={audioSettings.cameraEffects}
             />
           </Suspense>
         </SceneErrorBoundary>
@@ -298,11 +320,13 @@ export function App() {
             <p>{tabHidden ? 'La simulation a été suspendue quand vous avez quitté l’onglet.' : 'La simulation est suspendue.'}</p>
             <button className="btn" onClick={resumeGame}>Reprendre</button>
             <button className="btn-quiet" onClick={respawn}>Repositionner la voiture</button>
+            <AudioSettingsPanel settings={audioSettings} onChange={updateAudioSettings} />
             <dl className="controls-list">
               <dt><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Accélérer, braquer, freiner</dd>
               <dt><kbd>Espace</kbd></dt><dd>Frein à main</dd>
               <dt><kbd>R</kbd></dt><dd>Repositionner</dd>
               <dt><kbd>T</kbd></dt><dd>Afficher les détails</dd>
+              <dt><kbd>M</kbd></dt><dd>Couper ou rétablir le son</dd>
               <dt><kbd>Échap</kbd></dt><dd>Pause</dd>
             </dl>
           </div>

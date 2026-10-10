@@ -35,7 +35,7 @@ export async function launchPage({ width = 1280, height = 720, gpu = false } = {
   const profile = mkdtempSync(join(tmpdir(), 'cardrive-e2e-'));
   const args = [
     '--headless=new', `--remote-debugging-port=${port}`, `--window-size=${width},${height}`, '--hide-scrollbars', '--mute-audio',
-    '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--force-device-scale-factor=1', `--user-data-dir=${profile}`,
+    '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--no-default-browser-check', '--disable-extensions', '--force-device-scale-factor=1', `--user-data-dir=${profile}`,
     ...(gpu ? [] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']),
     'about:blank',
   ];

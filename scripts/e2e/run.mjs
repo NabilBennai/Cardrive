@@ -114,9 +114,22 @@ const assertNoProblems = (page, where, { ignoreThirdParty = false } = {}) => {
   if (found.length > 0) throw new Error(`${where} : ${found.length} problème(s) de console :\n  - ${found.slice(0, 5).join('\n  - ')}`);
 };
 
+/** Ouvre ou ferme le panneau de performance (F3) selon son état courant. */
+async function setPerfOverlay(page, open) {
+  const isOpen = await page.eval("Boolean(document.querySelector('[data-perf-overlay]'))");
+  if (isOpen !== open) await page.tap('F3', 'F3');
+  if (open) await page.waitFor("document.querySelector('[data-perf-overlay]')", 'le panneau de performance (F3)');
+}
+
+/** Lit la ligne « Son » du panneau : état du contexte audio, fréquence du moteur (Hz), crissement, niveau de sortie (dBFS). */
+async function readAudio(page) {
+  const text = await page.eval("document.querySelector('[data-perf=\"audio\"]')?.textContent ?? ''");
+  const [state, hz, squeal, level] = text.replace(/[\s\u202f\u00a0]/g, '').replace(/−/g, '-').split('·');
+  return { state, hz: Number.parseFloat(hz), squeal: Number.parseFloat(squeal), level: level?.includes('∞') ? -120 : Number.parseFloat(level), text };
+}
+
 async function readPerf(page) {
-  await page.tap('F3', 'F3');
-  await page.waitFor("document.querySelector('[data-perf-overlay]')", 'le panneau de performance (F3)');
+  await setPerfOverlay(page, true);
   await sleep(1_800);
   const read = (id) => page.eval(`document.querySelector('[data-perf="${id}"]')?.textContent ?? ''`);
   // Le séparateur de milliers français est une espace insécable fine (U+202F) : on retire toutes les espaces avant d'extraire les nombres.
@@ -127,16 +140,21 @@ async function readPerf(page) {
   const [vehicleSolver] = numbers(await read('vehicle-ms'));
   const [triangles] = numbers(await read('triangles'));
   const [drawCalls] = numbers(await read('draw-calls'));
-  await page.tap('F3', 'F3');
-  return { fps, frameP95, physicsAverage, vehicleSolver, triangles, drawCalls };
+  const audioText = (await readAudio(page)).text;
+  await setPerfOverlay(page, false);
+  return { fps, frameP95, physicsAverage, vehicleSolver, triangles, drawCalls, audioText };
 }
 
 async function driveAndCheck(page, label, options = {}) {
+  let audioSummary;
   await page.waitFor("document.querySelector('.hud-layer')", 'le tableau de bord', 90_000);
   await page.waitFor("document.querySelector('.game-canvas canvas')", 'le canevas 3D');
   // La scène (chargement paresseux du moteur 3D, WebAssembly, modèles) met plusieurs secondes à devenir active en rendu
   // logiciel : on maintient l'accélérateur jusqu'à voir la vitesse monter, au lieu d'attendre une durée fixe.
   await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement de la scène', 90_000);
+  await setPerfOverlay(page, true);
+  await sleep(1_200);
+  const idleAudio = await readAudio(page);
   const startedAt = Date.now();
   await page.key('keyDown', 'KeyW', 'w');
   let speed = 0;
@@ -152,7 +170,14 @@ async function driveAndCheck(page, label, options = {}) {
     throw new Error(`${label} : la voiture n'a pas accéléré (vitesse affichée ${speed} km/h après ${secondsToTwentyFive.toFixed(0)} s de plein gaz). Trace : ${trace.filter((_, i) => i % 12 === 0).join(' ')}`);
   }
   await sleep(1_500);
+  const drivingAudio = await readAudio(page);
   await page.key('keyUp', 'KeyW', 'w');
+  await setPerfOverlay(page, false);
+  // Le son doit exister (contexte en marche, niveau de sortie audible) et suivre le moteur : plus aigu en accélérant qu'au ralenti.
+  if (idleAudio.state !== 'running' || drivingAudio.state !== 'running') throw new Error(`${label} : le contexte audio n'est pas en marche (${idleAudio.state} / ${drivingAudio.state}).`);
+  if (!(drivingAudio.level > -50)) throw new Error(`${label} : aucun son audible en conduite (niveau ${drivingAudio.level} dBFS).`);
+  if (!(drivingAudio.hz > idleAudio.hz * 1.5)) throw new Error(`${label} : le moteur ne monte pas en hauteur (${idleAudio.hz} Hz au ralenti, ${drivingAudio.hz} Hz en accélérant).`);
+  audioSummary = `moteur ${idleAudio.hz.toFixed(0)} → ${drivingAudio.hz.toFixed(0)} Hz, niveau ${drivingAudio.level.toFixed(0)} dBFS`;
   const shot = await page.screenshot();
   writeFileSync(join(outputDir, `${label}.png`), shot);
   const spread = await luminanceSpread(page, shot);
@@ -161,7 +186,7 @@ async function driveAndCheck(page, label, options = {}) {
   const perf = await readPerf(page);
   if (perf.vehicleSolver > 1 * E2E_PHYSICS_BUDGET_FACTOR) throw new Error(`${label} : solveur véhicule ${perf.vehicleSolver} ms/pas (budget ${E2E_PHYSICS_BUDGET_FACTOR} ms).`);
   if (perf.physicsAverage > 4 * E2E_PHYSICS_BUDGET_FACTOR) throw new Error(`${label} : pas physique ${perf.physicsAverage} ms (budget ${4 * E2E_PHYSICS_BUDGET_FACTOR} ms).`);
-  return `25 km/h atteints en ${secondsToTwentyFive.toFixed(1)} s · ${perf.fps.toFixed(0)} img/s · pas physique ${perf.physicsAverage.toFixed(2)} ms · solveur ${perf.vehicleSolver.toFixed(3)} ms · ${perf.triangles.toLocaleString('fr-FR')} triangles`;
+  return `${audioSummary} · 25 km/h atteints en ${secondsToTwentyFive.toFixed(1)} s · ${perf.fps.toFixed(0)} img/s · pas physique ${perf.physicsAverage.toFixed(2)} ms · solveur ${perf.vehicleSolver.toFixed(3)} ms · ${perf.triangles.toLocaleString('fr-FR')} triangles`;
 }
 
 
@@ -299,6 +324,41 @@ try {
     const minimap = await page.eval("Boolean(document.querySelector('.minimap-canvas'))");
     if (!minimap) throw new Error('Mini-carte du circuit absente.');
     return detail;
+  });
+
+  await scenario('Dérapage (grincement, fumée, traces) et sourdine', async () => {
+    await home(page);
+    await page.click('Circuits F1 2026');
+    await page.waitFor("document.querySelector('.circuit-card')", 'le catalogue de circuits');
+    if (!(await page.click('Singapour'))) throw new Error('Circuit de Singapour introuvable.');
+    await page.waitFor("document.querySelector('.hud-layer')", 'le tableau de bord', 90_000);
+    await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement de la scène', 90_000);
+    await setPerfOverlay(page, true);
+    await page.key('keyDown', 'KeyW', 'w');
+    await page.waitFor("Number(document.querySelector('.speed b')?.textContent ?? 0) >= 90", '90 km/h', 60_000);
+    // Frein à main + volant : les roues arrière se bloquent et la voiture part en travers.
+    await page.key('keyDown', 'KeyD', 'd');
+    await page.key('keyDown', 'Space', ' ');
+    let loudestSqueal = 0;
+    for (let i = 0; i < 8; i += 1) {
+      await sleep(250);
+      loudestSqueal = Math.max(loudestSqueal, (await readAudio(page)).squeal);
+    }
+    writeFileSync(join(outputDir, 'derapage.png'), await page.screenshot());
+    await page.key('keyUp', 'Space', ' ');
+    await page.key('keyUp', 'KeyD', 'd');
+    await page.key('keyUp', 'KeyW', 'w');
+    // Sourdine (M) : la sortie doit retomber au silence.
+    await page.tap('KeyM', 'm');
+    // Le panneau n'est rafraîchi que toutes les 6 images : en rendu logiciel, le silence met quelques secondes à s'afficher.
+    let muted = await readAudio(page);
+    for (let i = 0; i < 20 && !(muted.level < -70); i += 1) { await sleep(300); muted = await readAudio(page); }
+    await page.tap('KeyM', 'm');
+    await setPerfOverlay(page, false);
+    assertNoProblems(page, 'derapage');
+    if (!(loudestSqueal > 0.05)) throw new Error(`Aucun grincement de pneus audible en dérapage (gain max ${loudestSqueal.toFixed(3)}).`);
+    if (!(muted.level < -70)) throw new Error(`La sourdine (M) ne coupe pas le son (niveau ${muted.level.toFixed(0)} dBFS).`);
+    return `grincement max ${loudestSqueal.toFixed(2)} · sourdine ${muted.level.toFixed(0)} dBFS`;
   });
 
   await scenario('Pause et reprise', async () => {

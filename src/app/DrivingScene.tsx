@@ -1,10 +1,13 @@
 import { Canvas } from '@react-three/fiber';
 import { Physics, type RapierRigidBody } from '@react-three/rapier';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import type { GeoAnchor } from '../geo/projection';
 import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../shared/types';
 import { ChaseCamera } from '../camera/ChaseCamera';
+import { AudioDriver } from '../audio/AudioDriver';
 import { PerfProbe } from '../debug/PerfProbe';
+import { TireEffects } from '../feel/TireEffects';
+import type { WheelPose } from '../vehicle/physics/VehicleSimulation';
 import { FollowingSun } from './FollowingSun';
 import { CircuitScene } from '../circuits/CircuitScene';
 import type { CircuitTrack } from '../circuits/circuitGeometry';
@@ -37,11 +40,17 @@ interface DrivingSceneProps {
   carModelUrl?: string | null;
   /** Configuration physique du véhicule choisi. */
   vehicle: VehicleConfig;
+  /** Identifiant du catalogue du véhicule (caractère du moteur) ; null pour le prototype. */
+  carId: string | null;
+  /** Tremblement de caméra et champ de vision variable (réglage du joueur). */
+  cameraEffects: boolean;
 }
 
 export function DrivingScene({
-  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle,
+  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects,
 }: DrivingSceneProps) {
+  // Poses de roues du solveur, partagées avec les effets de pneus (fumée, traces).
+  const wheelPosesRef = useRef<WheelPose[] | null>(null);
   const spawnPose = world.kind === 'roads'
     ? { position: { x: world.spawnPose.position.xM, y: vehicleSpawnHeightM(vehicle), z: world.spawnPose.position.zM }, rotation: headingToQuaternion(world.spawnPose.headingRad) }
     : world.kind === 'circuit'
@@ -94,9 +103,12 @@ export function DrivingScene({
             onAfterPhysicsStep={world.kind === 'roads' ? floatingOrigin.onAfterPhysicsStep : undefined}
             modelUrl={carModelUrl}
             config={vehicle}
+            wheelPosesOutRef={wheelPosesRef}
           />
           <FloatingOriginApplier origin={floatingOrigin} />
-          <ChaseCamera bodyRef={bodyRef} snapVersion={respawnVersion} />
+          <ChaseCamera bodyRef={bodyRef} snapVersion={respawnVersion} effects={cameraEffects} />
+          <TireEffects wheelPosesRef={wheelPosesRef} bodyRef={bodyRef} paused={paused} />
+          <AudioDriver bodyRef={bodyRef} telemetryRef={telemetryRef} vehicle={vehicle} carId={carId} paused={paused} respawnVersion={respawnVersion} />
           <PerfProbe />
         </Suspense>
       </Physics>

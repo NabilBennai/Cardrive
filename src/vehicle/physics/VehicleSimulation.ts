@@ -19,6 +19,14 @@ export interface WheelPose {
   temperatureC: number;
   /** Température de la carcasse (°C) : inertielle, elle réchauffe lentement la bande. */
   carcassTemperatureC: number;
+  /** Vrai si la roue appuie sur le sol à ce pas. */
+  grounded: boolean;
+  /** Puissance de frottement au contact (W) : mesure physique du glissement, base de la fumée et des traces de pneus. */
+  slidingPowerW: number;
+  /** Point de contact au sol (repère de rendu courant) ; valide seulement si `grounded`. */
+  contactX: number;
+  contactY: number;
+  contactZ: number;
 }
 
 const clamp = (value: number, lower: number, upper: number) => Math.max(lower, Math.min(upper, value));
@@ -91,6 +99,7 @@ export class VehicleSimulation {
     this.wheelPoses = config.wheelMounts.map(({ xM, zM }) => ({
       xM, zM, suspensionM: config.suspensionRestLengthM, steeringRad: 0, spinRad: 0, omegaRadPerS: 0,
       temperatureC: config.ambientTemperatureC, carcassTemperatureC: config.ambientTemperatureC,
+      grounded: false, slidingPowerW: 0, contactX: 0, contactY: 0, contactZ: 0,
     }));
     this.impulses = config.wheelMounts.map(() => ({ impulse: new Vector3(), point: new Vector3() }));
     const staticLoadN = staticWheelLoadN(config.massKg);
@@ -120,6 +129,8 @@ export class VehicleSimulation {
       pose.omegaRadPerS = 0;
       pose.temperatureC = this.config.ambientTemperatureC;
       pose.carcassTemperatureC = this.config.ambientTemperatureC;
+      pose.grounded = false;
+      pose.slidingPowerW = 0;
     }
   }
 
@@ -344,6 +355,9 @@ export class VehicleSimulation {
       );
       pose.temperatureC = thermal.surfaceC;
       pose.carcassTemperatureC = thermal.carcassC;
+      pose.grounded = inContact;
+      pose.slidingPowerW = inContact ? slidingPowerW : 0;
+      if (inContact) { pose.contactX = this.point.x; pose.contactY = this.point.y; pose.contactZ = this.point.z; }
     }
     for (const pending of this.impulses) {
       if (pending.impulse.lengthSq() > 0) body.applyImpulseAtPoint(pending.impulse, pending.point, true);

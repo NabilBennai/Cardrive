@@ -136,24 +136,27 @@ Mesurer au lieu de supposer a trouvé **trois défauts réels**, absents de tous
 
 ---
 
-## 4. Phase 1 — Son et ressenti
+## 4. Phase 1 — Son et ressenti 🟡
 
-Le jeu est muet : c’est ce qui lui retire le plus de vie, pour un coût raisonnable.
+Le jeu était muet : c’est ce qui lui retirait le plus de vie. Tout est synthétisé (aucun fichier audio, donc aucune licence à suivre).
 
-### R-1.1 Moteur — M/L ⬜
-- **Approche** : Web Audio API, synthèse sans fichier : oscillateurs ou lecture bouclée en granulaire pilotés par `engineRpm` et la charge (`throttle`), filtre passe-bas lié à la charge, harmoniques selon le nombre de cylindres. Un profil sonore par catégorie de véhicule (essai 4 cylindres, V8, moteur de course aigu, diesel de camion, kart 2-temps).
-- **Pièges** : le contexte audio ne démarre qu’après un geste utilisateur (le bouton « Jouer » convient) ; éviter les clics lors des changements de rapport (rampes de gain).
-- **Fin** : le régime s’entend monter et redescendre ; la coupure de couple aux changements de rapport s’entend ; coupure propre à la pause.
+### R-1.1 Moteur ✅
+- Oscillateurs (fondamentale, harmoniques 2 à 4, sous-harmonique) → saturation → passe-bas, pilotés par `engineRpm` et la charge ; fréquence de combustion selon le nombre de cylindres ; ronflement d’admission. Un profil par véhicule du catalogue (4 cylindres, 6 cylindres, V8, diesel, 10 cylindres de course, 2-temps du kart) et un profil électrique (sifflement) pour le prototype futuriste.
+- Coupure de couple aux changements de rapport (baisse de 0,22 s), limiteur de régime audible (hachage à 14 Hz). Le contexte démarre au premier geste, fondu et suspension à la pause.
+- Vérifié en e2e (rendu matériel) : le contexte tourne, la hauteur passe de ≈ 30 Hz à ≈ 205 Hz et la sortie est à ≈ −13 dBFS.
 
-### R-1.2 Pneus, vent, impacts — M ⬜
-- Crissement piloté par le **glissement normalisé** déjà calculé (`telemetry.slip`, seuil 1,15), volume et hauteur selon la vitesse de glissement ; bruit de roulement selon la vitesse et la surface ; vent selon la vitesse ; chocs selon l’impulsion de collision (écouter les événements de contact Rapier).
-- **Fin** : un dérapage s’entend avant de se voir.
+### R-1.2 Pneus, vent, impacts ✅
+- Crissement piloté par `telemetry.slip` (début 0,95, plein à 1,6, nul sous 3 m/s), bruit de roulement et vent selon la vitesse, chocs détectés par la variation de vitesse d’un pas physique à l’autre (> 2,5 m/s).
+- Vérifié en e2e : un dérapage au frein à main fait monter le crissement (≈ 0,4) et la touche M coupe la sortie (−120 dBFS).
+- Limite connue : le bruit de roulement ne dépend pas encore de la surface (R-3.1).
 
-### R-1.3 Volume, mixage et accessibilité sonore — S ⬜
-- Curseurs volume général / moteur / effets, mémorisés ; option « sans son » ; pas de son tant que l’onglet est masqué.
+### R-1.3 Volume, mixage et accessibilité sonore ✅
+- Menu pause : volume général, moteur, pneus/vent/chocs (courbe quadratique), « Sans son » (touche M) et « Effets de caméra » ; réglages mémorisés (`cardrive.audioSettings`). Le son se coupe quand le jeu est en pause ou l’onglet masqué.
 
-### R-1.4 Retour visuel du ressenti — M ⬜
-- Fumée et marques de pneus au patinage et au blocage, poussière hors piste, étincelles au contact des murs, léger tremblement de caméra aux chocs et à haute vitesse, champ de vision qui s’ouvre avec la vitesse. Tout est piloté par des grandeurs déjà exposées (glissement par roue, vitesse, impulsions).
+### R-1.4 Retour visuel du ressenti 🟡
+- Livré : fumée des pneus (puissance de frottement), traces noires au sol (anneau de 6 000 quadrilatères), étincelles aux chocs, tremblement de caméra (vibration à haute vitesse + choc qui s’éteint en 0,55 s), champ de vision de 52° à 65° selon la vitesse. Tout est désactivé par `prefers-reduced-motion` ou l’option « Effets de caméra ». Les effets suivent les recentrages d’origine flottante.
+- **Reporté** : poussière hors piste, volontairement : sans surfaces (R-3.1) elle ne saurait pas quand apparaître.
+- Vérifié sur capture (Singapour, frein à main à 90 km/h) : traces et fumée visibles ; non mesuré en images/s au-delà du scénario e2e (100 img/s, plafonné).
 
 ---
 
