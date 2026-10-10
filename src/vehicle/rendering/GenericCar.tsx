@@ -1,10 +1,11 @@
 import { RigidBody, type RapierRigidBody, CuboidCollider } from '@react-three/rapier';
 import { useFrame } from '@react-three/fiber';
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { Suspense, useCallback, useLayoutEffect, useRef } from 'react';
 import { ExtrudeGeometry, Shape, type Group } from 'three';
 import type { VehicleInput, VehicleTelemetry } from '../../shared/types';
 import { genericVehicle } from '../configs/genericVehicle';
 import { useVehiclePhysics, type WheelPose } from '../physics/useVehiclePhysics';
+import { KenneyCarModel } from './KenneyCarModel';
 import { resetVehicleBody, vehicleMassProperties, VEHICLE_COLLIDER_FRICTION, VEHICLE_COLLIDER_RESTITUTION, VEHICLE_SPAWN } from '../physics/vehicleBody';
 
 const rigidBodyMassProperties = vehicleMassProperties(genericVehicle);
@@ -24,6 +25,8 @@ interface GenericCarProps {
   spawnPose?: VehicleSpawnPose;
   /** Origine flottante (étape 4) : voir useVehiclePhysics.ts. Absent par défaut, aucun changement pour la démo. */
   onAfterPhysicsStep?: (telemetry: VehicleTelemetry, body: RapierRigidBody) => void;
+  /** URL d'un modèle GLB du catalogue ; absente/null : carrosserie procédurale d'origine. Seul le visuel change, jamais la physique. */
+  modelUrl?: string | null;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
@@ -340,7 +343,7 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep }: GenericCarProps) {
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl }: GenericCarProps) {
   const wheelPosesRef = useRef(initialWheelPoses());
   const physics = useVehiclePhysics({ bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep });
   const previousRespawnVersion = useRef(respawnVersion);
@@ -389,22 +392,30 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
         friction={VEHICLE_COLLIDER_FRICTION}
         restitution={VEHICLE_COLLIDER_RESTITUTION}
       />
-      <group position={[0, GROUND_OFFSET_M, 0]}>
-        <mesh geometry={bodyShellGeometry} castShadow receiveShadow>
-          <meshStandardMaterial color={PAINT_COLOR} metalness={0.42} roughness={0.3} />
-        </mesh>
-        <mesh position={[0, 0.17, 0]}>
-          <boxGeometry args={[BODY_WIDTH_M * 1.002, 0.1, BODY_LENGTH_M - 0.1]} />
-          <meshStandardMaterial color={PAINT_SHADOW_COLOR} metalness={0.2} roughness={0.55} />
-        </mesh>
-        <Glasshouse />
-        <FrontFascia />
-        <RearFascia />
-        <SideDetails />
-      </group>
-      {physics.wheelMounts.map((wheel, index) => (
-        <Wheel key={index} wheelPosesRef={wheelPosesRef} wheelIndex={index} side={wheel.xM < 0 ? -1 : 1} />
-      ))}
+      {modelUrl ? (
+        <Suspense fallback={null}>
+          <KenneyCarModel url={modelUrl} wheelPosesRef={wheelPosesRef} groundOffsetM={GROUND_OFFSET_M} />
+        </Suspense>
+      ) : (
+        <>
+          <group position={[0, GROUND_OFFSET_M, 0]}>
+            <mesh geometry={bodyShellGeometry} castShadow receiveShadow>
+              <meshStandardMaterial color={PAINT_COLOR} metalness={0.42} roughness={0.3} />
+            </mesh>
+            <mesh position={[0, 0.17, 0]}>
+              <boxGeometry args={[BODY_WIDTH_M * 1.002, 0.1, BODY_LENGTH_M - 0.1]} />
+              <meshStandardMaterial color={PAINT_SHADOW_COLOR} metalness={0.2} roughness={0.55} />
+            </mesh>
+            <Glasshouse />
+            <FrontFascia />
+            <RearFascia />
+            <SideDetails />
+          </group>
+          {physics.wheelMounts.map((wheel, index) => (
+            <Wheel key={index} wheelPosesRef={wheelPosesRef} wheelIndex={index} side={wheel.xM < 0 ? -1 : 1} />
+          ))}
+        </>
+      )}
     </RigidBody>
   );
 }

@@ -27,10 +27,12 @@ interface DrivingSceneProps {
   /** Étape 4 : remonte l'ancre de rendu courante vers App.tsx (corrige la mini-carte après un recentrage — voir plan). */
   onRenderAnchorChange?: (anchor: GeoAnchor) => void;
   onZoneUnavailable?: (unavailable: boolean) => void;
+  /** Modèle GLB du catalogue pour la carrosserie ; null/absent : carrosserie procédurale d'origine. */
+  carModelUrl?: string | null;
 }
 
 export function DrivingScene({
-  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable,
+  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl,
 }: DrivingSceneProps) {
   const spawnPose = world.kind === 'roads'
     ? { position: { x: world.spawnPose.position.xM, y: 0.8, z: world.spawnPose.position.zM }, rotation: headingToQuaternion(world.spawnPose.headingRad) }
@@ -79,6 +81,7 @@ export function DrivingScene({
             onTelemetry={onTelemetry}
             spawnPose={spawnPose}
             onAfterPhysicsStep={world.kind === 'roads' ? floatingOrigin.onAfterPhysicsStep : undefined}
+            modelUrl={carModelUrl}
           />
           <ChaseCamera bodyRef={bodyRef} snapVersion={cameraSnapVersion} />
         </Suspense>

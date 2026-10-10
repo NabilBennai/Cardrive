@@ -1,0 +1,89 @@
+import { useFrame, useLoader } from '@react-three/fiber';
+import { useMemo } from 'react';
+import { Box3, Group, Mesh, Vector3, type Object3D } from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { genericVehicle } from '../configs/genericVehicle';
+import type { WheelPose } from '../physics/useVehiclePhysics';
+
+const { lengthM: PHYSICS_LENGTH_M } = genericVehicle.dimensionsM;
+/** Largeur visuelle maximale visée : un peu au-dessus du collider (1,67 m), les modèles Kenney étant volontairement larges. */
+const MAX_VISUAL_WIDTH_M = 1.9;
+const WHEEL_SUSPENSION_ANCHOR_M = 0.08;
+
+interface WheelRig {
+  /** Pivot de direction (rotation Y) placé à la position de la roue ; la roue d'origine est son enfant et tourne en X. */
+  steer: Group;
+  wheel: Object3D;
+  radiusModelM: number;
+}
+
+interface KenneyCarModelProps {
+  url: string;
+  wheelPosesRef: React.RefObject<WheelPose[]>;
+  /** Hauteur du sol sous l'origine du châssis (négative), identique à celle de la carrosserie procédurale. */
+  groundOffsetM: number;
+}
+
+/** Associe chaque roue physique (avant/arrière, gauche/droite) au nœud « wheel-… » du modèle ; +X est la gauche (xM > 0) pour un véhicule orienté vers +Z. */
+function matchWheel(root: Object3D, front: boolean, xSign: number): Object3D | null {
+  let found: Object3D | null = null;
+  root.traverse((node) => {
+    // Nom exact : le SUV a aussi un nœud « wheel-back » (roue de secours fixe) qui ne doit pas être animé.
+    const match = /^wheel-(front|back)-(left|right)$/.exec(node.name);
+    if (found || !match) return;
+    if ((match[1] === 'front') === front && (match[2] === 'left') === (xSign > 0)) found = node;
+  });
+  return found;
+}
+
+/**
+ * Carrosserie issue d'un GLB du Car Kit de Kenney, animée par les poses de roues de la
+ * simulation (suspension, braquage, rotation) exactement comme les roues procédurales de
+ * GenericCar. Le modèle est mis à l'échelle (uniforme) pour tenir dans le gabarit du collider
+ * Rapier : sa longueur ne dépasse pas celle du châssis physique, sa largeur reste proche.
+ */
+export function KenneyCarModel({ url, wheelPosesRef, groundOffsetM }: KenneyCarModelProps) {
+  const gltf = useLoader(GLTFLoader, url);
+
+  const { root, scale, rigs } = useMemo(() => {
+    const clone = gltf.scene.clone(true);
+    clone.traverse((node) => {
+      if ((node as Mesh).isMesh) { node.castShadow = true; node.receiveShadow = true; }
+    });
+
+    const box = new Box3().setFromObject(clone);
+    const size = box.getSize(new Vector3());
+    const fit = Math.min(PHYSICS_LENGTH_M / size.z, MAX_VISUAL_WIDTH_M / size.x);
+
+    const wheelRigs: Array<WheelRig | null> = genericVehicle.wheelMounts.map((mount) => {
+      const wheel = matchWheel(clone, mount.front, Math.sign(mount.xM));
+      if (!wheel || !wheel.parent) return null;
+      const wheelBox = new Box3().setFromObject(wheel);
+      const radiusModelM = (wheelBox.max.y - wheelBox.min.y) / 2;
+      const steer = new Group();
+      steer.position.copy(wheel.position);
+      wheel.position.set(0, 0, 0);
+      wheel.parent.add(steer);
+      steer.add(wheel);
+      return { steer, wheel, radiusModelM };
+    });
+    return { root: clone, scale: fit, rigs: wheelRigs };
+  }, [gltf]);
+
+  // Pas de nettoyage manuel du clone : R3F le détache avec le <primitive>, et en StrictMode (montage/démontage/remontage) un removeFromParent() le ferait disparaître définitivement. gltf.scene, partagé par le cache du loader, n'est jamais modifié.
+
+  useFrame(() => {
+    rigs.forEach((rig, index) => {
+      if (!rig) return;
+      const pose = wheelPosesRef.current[index];
+      // Centre de roue physique au-dessus du sol, puis corrigé de l'écart de rayon visuel/physique
+      // pour que le bas du pneu reste exactement au sol quelle que soit la taille de la roue du modèle.
+      const centerAboveGroundM = (-WHEEL_SUSPENSION_ANCHOR_M - pose.suspensionM - groundOffsetM) + (rig.radiusModelM * scale - genericVehicle.wheelRadiusM);
+      rig.steer.position.y = centerAboveGroundM / scale;
+      rig.steer.rotation.y = pose.steeringRad;
+      rig.wheel.rotation.x = pose.spinRad;
+    });
+  });
+
+  return <primitive object={root} position={[0, groundOffsetM, 0]} scale={scale} />;
+}
