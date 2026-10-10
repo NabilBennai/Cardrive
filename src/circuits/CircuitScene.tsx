@@ -1,3 +1,4 @@
+import { useFrame } from '@react-three/fiber';
 import { CuboidCollider, RigidBody, TrimeshCollider } from '@react-three/rapier';
 import { useEffect, useMemo } from 'react';
 import { DoubleSide, MeshStandardMaterial } from 'three';
@@ -15,8 +16,18 @@ const START_LINE_DEPTH_M = 1.4;
 const wallMaterial = new MeshStandardMaterial({ color: '#d8dcdf', roughness: 0.8, side: DoubleSide });
 const startLineMaterial = new MeshStandardMaterial({ color: '#f4f4ef', roughness: 0.7 });
 
+/** Humidité de la piste (0..1), lue à chaque image pour assombrir et rendre luisant le revêtement. */
 interface CircuitSceneProps {
   track: CircuitTrack;
+  environmentRef?: React.RefObject<{ wetness: number }>;
+}
+
+const DRY_ROUGHNESS = 0.92;
+
+/** Piste mouillée : revêtement plus sombre et plus lisse (fonction externe : le matériau vient d'un useMemo). */
+function applyWetLook(material: MeshStandardMaterial, wetness: number): void {
+  material.roughness = DRY_ROUGHNESS - 0.62 * wetness;
+  material.color.setScalar(1 - 0.32 * wetness);
 }
 
 /**
@@ -24,12 +35,14 @@ interface CircuitSceneProps {
  * d'origine flottante, un circuit de F1 tient dans quelques kilomètres. Sol herbeux avec
  * collider, piste et vibreurs (visuels), murs d'enceinte (visuels + collider trimesh).
  */
-export function CircuitScene({ track }: CircuitSceneProps) {
+export function CircuitScene({ track, environmentRef }: CircuitSceneProps) {
   const layout = useMemo(() => buildCircuitLayout(track), [track]);
   const asphaltMaterial = useMemo(() => new MeshStandardMaterial({ map: createCircuitAsphaltTexture(), roughness: 0.92 }), []);
   const kerbMaterial = useMemo(() => new MeshStandardMaterial({ map: createKerbTexture(), roughness: 0.7 }), []);
   const groundTexture = useMemo(() => createCircuitGroundTexture(), []);
   const groundMaterial = useMemo(() => new MeshStandardMaterial({ map: groundTexture, roughness: 0.95 }), [groundTexture]);
+
+  useFrame(() => { if (environmentRef) applyWetLook(asphaltMaterial, environmentRef.current.wetness); });
 
   const [groundHalfX, groundHalfZ] = layout.ground.halfExtentM;
   useEffect(() => {

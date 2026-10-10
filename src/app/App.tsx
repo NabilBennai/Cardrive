@@ -20,6 +20,8 @@ import { Minimap } from '../ui/Minimap';
 import { CircuitMinimap } from '../ui/CircuitMinimap';
 import { LapHud } from '../ui/LapHud';
 import { RaceHud, RaceResults } from '../ui/RaceHud';
+import { WeatherControls } from '../ui/WeatherControls';
+import { loadWeather, saveWeather, type WeatherSettings } from '../world/weather/weatherModel';
 import type { RaceState } from '../race/RaceDirector';
 import { buildRaceField, loadRaceSetup, saveRaceSetup, type RaceField, type RaceSetup } from '../race/raceSetup';
 import { useRaceSession } from '../race/useRaceSession';
@@ -114,6 +116,10 @@ export function App() {
       return next;
     });
   }, []);
+  const [weather, setWeather] = useState<WeatherSettings>(loadWeather);
+  const chooseWeather = useCallback((next: WeatherSettings) => { setWeather(next); saveWeather(next); }, []);
+  /** Humidité de la piste (0..1), remontée par la scène : sert au message « piste mouillée ». */
+  const [wetness, setWetness] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const chooseWear = useCallback((wearAndFuel: boolean) => {
     setAssists((current) => {
@@ -322,6 +328,8 @@ export function App() {
               transmission={isTouchDevice ? 'auto' : assists.transmission}
               wearEnabled={assists.wearAndFuel}
               serviceVersion={serviceVersion}
+              weather={weather}
+              onWetnessChange={setWetness}
               onFlippedChange={setFlipped}
               onAutoRecover={respawn}
             />
@@ -330,7 +338,7 @@ export function App() {
       )}
 
       {!playing && showCircuitPicker && (
-        <CircuitPicker onChoose={startCircuit} onBack={() => setShowCircuitPicker(false)} records={raceSession.records} carId={selectedCarId} setup={raceSetup} onSetupChange={chooseRaceSetup} />
+        <CircuitPicker onChoose={startCircuit} onBack={() => setShowCircuitPicker(false)} records={raceSession.records} carId={selectedCarId} setup={raceSetup} onSetupChange={chooseRaceSetup} weather={weather} onWeatherChange={chooseWeather} />
       )}
 
       {!playing && showCarPicker && (
@@ -386,6 +394,7 @@ export function App() {
         <TouchControls setStick={touchInput.setStick} setHandbrake={touchInput.setHandbrake} />
       )}
 
+      {playing && wetness > 0.3 && <p className="limit-pill wet-pill" role="status">{wetness > 0.75 ? 'Piste détrempée · risque d’aquaplanage' : 'Piste mouillée'}</p>}
       {playing && flipped && <p className="limit-pill flip-pill" role="status">Voiture retournée · appuyez sur R pour la remettre sur ses roues{raceField ? ' (remise en piste automatique)' : ''}</p>}
       {playing && circuitTrack && <LapHud state={raceSession.hud} notice={raceSession.notice} />}
       {playing && circuitTrack && raceField && <RaceHud state={raceState} />}
@@ -417,7 +426,8 @@ export function App() {
             <button className="btn-quiet" onClick={respawn}>Repositionner la voiture</button>
             <button className="btn-quiet" onClick={quitToMenu}>Quitter vers le menu</button>
             <fieldset className="settings-group">
-              <legend>Aides à la conduite</legend>
+              <legend>Conditions et aides à la conduite</legend>
+              <WeatherControls weather={weather} onChange={chooseWeather} />
               {!isTouchDevice && (
                 <div className="setup-row">
                   <span>Boîte de vitesses</span>

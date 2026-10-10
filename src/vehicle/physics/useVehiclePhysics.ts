@@ -36,9 +36,11 @@ export interface VehiclePhysicsOptions {
   wearEnabled?: boolean;
   /** Incrémenté pour changer les pneus et refaire le plein. */
   serviceVersion?: number;
+  /** Conditions du moment (humidité de la piste, température de l'air), partagées par toutes les voitures de la scène. */
+  environmentRef?: React.RefObject<{ wetness: number; airC: number }>;
 }
 
-export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true, surfaceAt, tractionControl = 'off', transmission = 'auto', wearEnabled = false, serviceVersion = 0 }: VehiclePhysicsOptions) {
+export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true, surfaceAt, tractionControl = 'off', transmission = 'auto', wearEnabled = false, serviceVersion = 0, environmentRef }: VehiclePhysicsOptions) {
   const { rapier } = useRapier();
   const simulation = useMemo(() => new VehicleSimulation(config), [config]);
   const telemetryDelay = useRef(0);
@@ -65,6 +67,7 @@ export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelP
   useBeforePhysicsStep((world) => {
     const body = bodyRef.current;
     if (!body) return;
+    if (environmentRef) simulation.setEnvironment(environmentRef.current.wetness, environmentRef.current.airC);
     const solverStart = performance.now();
     if (drivesClock) markPhysicsStep(solverStart);
     const telemetry = simulation.step(world, rapier, body, input.current);

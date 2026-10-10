@@ -44,10 +44,12 @@ interface OpponentCarProps {
   bodyRef: React.RefObject<RapierRigidBody | null>;
   /** Vrai une fois les feux éteints : jusque-là, la voiture reste sur sa grille freins serrés. */
   goRef: React.RefObject<{ go: boolean }>;
+  /** Conditions du moment : le pilote adapte sa vitesse à l'humidité de la piste. */
+  environmentRef: React.RefObject<{ wetness: number; airC: number }>;
 }
 
 /** Voiture adverse : même solveur de véhicule que le joueur, conduite par le pilote automatique (mêmes commandes que le clavier). */
-export function OpponentCar({ spec, track, config, modelUrl, bodyRef, goRef }: OpponentCarProps) {
+export function OpponentCar({ spec, track, config, modelUrl, bodyRef, goRef, environmentRef }: OpponentCarProps) {
   const input = useRef<VehicleInput>({ ...HOLD_INPUT });
   const telemetryRef = useRef<VehicleTelemetry>(initialTelemetry(config, spec.slot));
   const respawnPoseRef = useRef<VehicleSpawnPose | null>(null);
@@ -68,6 +70,7 @@ export function OpponentCar({ spec, track, config, modelUrl, bodyRef, goRef }: O
     const position = body.translation();
     const velocity = body.linvel();
     const speedMps = Math.hypot(velocity.x, velocity.z);
+    driver.setTrackWetness(environmentRef.current.wetness);
     writeInput(input.current, driver.drive({
       xM: position.x, zM: position.z, headingRad: headingOfRotation(body.rotation()), speedMps,
       slip: telemetryRef.current.slip, dtS: world.timestep,
@@ -98,6 +101,7 @@ export function OpponentCar({ spec, track, config, modelUrl, bodyRef, goRef }: O
       drivesClock={false}
       respawnPoseRef={respawnPoseRef}
       surfaceAt={surfaceAt}
+      environmentRef={environmentRef}
     />
   );
 }

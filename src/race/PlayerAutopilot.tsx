@@ -20,13 +20,14 @@ interface PlayerAutopilotProps {
   input: React.RefObject<VehicleInput>;
   telemetryRef: React.RefObject<VehicleTelemetry>;
   respawnVersion: number;
+  environmentRef?: React.RefObject<{ wetness: number; airC: number }>;
 }
 
 /**
  * Crochet de test et de démonstration (adresse `?autopilot`) : le pilote automatique conduit la voiture du joueur sur un circuit, avec
  * les mêmes commandes que le clavier. Sert aux tests de bout en bout d'un tour complet (chrono, records, fantôme).
  */
-export function PlayerAutopilot({ track, config, bodyRef, input, telemetryRef, respawnVersion }: PlayerAutopilotProps) {
+export function PlayerAutopilot({ track, config, bodyRef, input, telemetryRef, respawnVersion, environmentRef }: PlayerAutopilotProps) {
   const driver = useMemo(() => {
     // Un repositionnement remet la voiture ailleurs : la projection repart d'une recherche globale.
     void respawnVersion;
@@ -38,6 +39,7 @@ export function PlayerAutopilot({ track, config, bodyRef, input, telemetryRef, r
     if (!body) return;
     const position = body.translation();
     const velocity = body.linvel();
+    if (environmentRef) driver.setTrackWetness(environmentRef.current.wetness);
     writeInput(input.current, driver.drive({
       xM: position.x, zM: position.z, headingRad: headingOfRotation(body.rotation()), speedMps: Math.hypot(velocity.x, velocity.z),
       slip: telemetryRef.current.slip, dtS: world.timestep,

@@ -3,6 +3,8 @@ import { circuitOutlinePath } from '../circuits/outline';
 import type { CircuitSource } from '../circuits/f1Circuits2026';
 import { formatLapTime } from '../race/lapTimer';
 import { recordKey, type RecordBook } from '../race/records';
+import { WeatherControls } from '../ui/WeatherControls';
+import type { WeatherSettings } from '../world/weather/weatherModel';
 import { DIFFICULTY_LABELS, LAP_CHOICES, RIVAL_CHOICES, type Difficulty, type RaceSetup } from '../race/raceSetup';
 
 interface CircuitPickerProps {
@@ -14,13 +16,16 @@ interface CircuitPickerProps {
   /** Mode de jeu choisi (contre-la-montre ou course) et ses réglages. */
   setup: RaceSetup;
   onSetupChange: (next: RaceSetup) => void;
+  /** Météo choisie (pluie, température). */
+  weather: WeatherSettings;
+  onWeatherChange: (next: WeatherSettings) => void;
 }
 
 const OUTLINE_SIZE_PX = 96;
 
 const formatKm = (lengthM: number) => `${(lengthM / 1000).toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} km`;
 
-export function CircuitPicker({ onChoose, onBack, records, carId, setup, onSetupChange }: CircuitPickerProps) {
+export function CircuitPicker({ onChoose, onBack, records, carId, setup, onSetupChange, weather, onWeatherChange }: CircuitPickerProps) {
   const [circuits, setCircuits] = useState<CircuitSource[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -51,6 +56,7 @@ export function CircuitPicker({ onChoose, onBack, records, carId, setup, onSetup
               <button aria-pressed={setup.mode === 'race'} onClick={() => onSetupChange({ ...setup, mode: 'race' })}>Course</button>
             </div>
           </div>
+          <WeatherControls weather={weather} onChange={onWeatherChange} />
           {setup.mode === 'race' && (
             <>
               <div className="setup-row">

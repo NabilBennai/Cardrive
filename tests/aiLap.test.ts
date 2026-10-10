@@ -27,7 +27,7 @@ function circuit(id: string): CircuitTrack {
 }
 
 /** Circuit complet (sol, murs) et voiture réelle (même solveur que le jeu) ; le pilote automatique la conduit, le chronomètre mesure. */
-function runLaps(track: CircuitTrack, config: VehicleConfig, laps: number, maxSimulatedS: number, skill = 1) {
+function runLaps(track: CircuitTrack, config: VehicleConfig, laps: number, maxSimulatedS: number, skill = 1, wetness = 0) {
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = dt;
   const layout = buildCircuitLayout(track);
@@ -49,6 +49,7 @@ function runLaps(track: CircuitTrack, config: VehicleConfig, laps: number, maxSi
   for (let i = 0; i < 120; i += 1) { simulation.step(world, RAPIER, body, idle); world.step(); }
 
   const driver = new AiDriver(track.centerline, track.lengthM, aiProfileFor(config, skill));
+  driver.setTrackWetness(wetness);
   const projector = new TrackProjector(track.centerline, track.lengthM);
   const timer = new LapTimer(track.lengthM, track.widthM);
   const events: LapTimerEvent[] = [];
@@ -66,6 +67,7 @@ function runLaps(track: CircuitTrack, config: VehicleConfig, laps: number, maxSi
     const headingRad = Math.atan2(2 * (r.x * r.z + r.w * r.y), 1 - 2 * (r.x * r.x + r.y * r.y));
     const speedMps = Math.hypot(v.x, v.z);
     const input = driver.drive({ xM: t.x, zM: t.z, headingRad, speedMps, slip: lastSlip, dtS: dt });
+    simulation.setEnvironment(wetness, 20);
     const telemetry = simulation.step(world, RAPIER, body, input);
     world.step();
     lastSlip = telemetry.slip;
@@ -144,4 +146,25 @@ describe('niveau du pilote', () => {
     expect(slow).toBeGreaterThan(fast * 1.04);
     expect(slow).toBeLessThan(fast * 1.5);
   }, 120_000);
+});
+
+describe('conduite sous la pluie', () => {
+  // La monoplace à slicks n'est conduite que sous pluie légère : sous forte pluie (aquaplanage dès ≈ 95 km/h) elle est ingérable, comme en vrai.
+  it.each<[string, string, number]>([['sedan-sports', 'it-1922', 1], ['race', 'jp-1962', 0.55]])('%s (%s) boucle des tours valides sous la pluie (humidité %s), plus lentement qu\'au sec', (carId, circuitId, rainWetness) => {
+    const track = circuit(circuitId);
+    const config = vehicleConfigFor(carId);
+    const lapOf = (wetness: number) => {
+      const { events, maxLateral } = runLaps(track, config, 2, 900, 1, wetness);
+      const laps = events.filter((e): e is Extract<LapTimerEvent, { type: 'lap' }> => e.type === 'lap');
+      expect(laps.length).toBeGreaterThanOrEqual(2);
+      expect(laps.every((l) => l.valid)).toBe(true);
+      expect(maxLateral).toBeLessThan(track.widthM / 2 + 4);
+      return (laps[1] as Extract<LapTimerEvent, { type: 'lap'; valid: true }>).lapS;
+    };
+    const dry = lapOf(0);
+    const wet = lapOf(rainWetness);
+    if (process.env.AI_TRACE) fs.appendFileSync(`${process.env.TEMP}/ai-summary.txt`, `pluie ${carId} ${circuitId}: sec ${dry.toFixed(1)} s, mouillé ${wet.toFixed(1)} s (×${(wet / dry).toFixed(2)})\n`);
+    expect(wet).toBeGreaterThan(dry * 1.03);
+    expect(wet).toBeLessThan(dry * 1.6);
+  }, 240_000);
 });

@@ -2,6 +2,7 @@ import type { RapierContext, RapierRigidBody } from '@react-three/rapier';
 import { Quaternion, Vector3 } from 'three';
 import type { SurfaceMaterial, VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types.ts';
 import { SURFACES, type SurfaceProvider } from './surfaces.ts';
+import { aquaplaningGripFactor, effectiveAmbientC, wetGripFactor, wetRollingFactor } from '../../world/weather/weatherModel.ts';
 import { fuelBurnedKg, wearGripFactor, wearIncrement } from './wearModel.ts';
 import {
   stableReferenceSpeedMps, staticWheelLoadN, stepTireThermal, temperatureGripFactor, thermalParamsFor, tireForce,
@@ -110,6 +111,9 @@ export class VehicleSimulation {
   private slipAngleReferenceSpeedMps = 0;
   private ray: InstanceType<RapierContext['rapier']['Ray']> | null = null;
   private surfaceProvider: SurfaceProvider | null = null;
+  /** Humidité de la piste (0..1) et température de l'air (°C) ; null = celle de la configuration. */
+  private wetness = 0;
+  private airC: number | null = null;
   private wearEnabled = false;
   /** Usure de chaque pneu (0 neuf … 1 lisse). */
   private readonly wear: number[];
@@ -220,6 +224,18 @@ export class VehicleSimulation {
     this.aeroPoint.set(0, 0, axleZM).applyQuaternion(this.rotation).add(this.position);
     this.aeroImpulse.copy(this.down).multiplyScalar(impulseNs);
     body.applyImpulseAtPoint(this.aeroImpulse, this.aeroPoint, true);
+  }
+
+  /**
+   * Conditions du moment : humidité de la piste et température de l'air. À appeler avant chaque pas. La première fois, les pneus
+   * prennent la température de l'air (une voiture neuve n'est pas à la température de la configuration).
+   */
+  setEnvironment(wetness: number, airC: number) {
+    this.wetness = wetness;
+    if (this.airC === null) {
+      for (const pose of this.wheelPoses) { pose.temperatureC = airC; pose.carcassTemperatureC = airC; }
+    }
+    this.airC = airC;
   }
 
   /** Active l'usure des pneus et la consommation de carburant (désactivées par défaut : voiture neuve, réservoir plein). */
@@ -390,7 +406,6 @@ export class VehicleSimulation {
       pose.steeringRad = wheel.front ? -this.steeringRad : 0;
       let gripFactor = temperatureGripFactor(pose.temperatureC, c.tireOptimalTemperatureC, c.tireTemperatureFalloffC, c.tireMinGripMultiplier);
       if (this.wearEnabled) gripFactor *= wearGripFactor(this.wear[index]);
-      let rollingFactor = 1;
 
       this.mount.set(wheel.xM, -0.08, wheel.zM).applyQuaternion(this.rotation).add(this.position);
       this.ray.origin.x = this.mount.x;
@@ -430,10 +445,14 @@ export class VehicleSimulation {
           c.damperNsPerM, -this.contactVelocity.dot(this.normal) / Math.max(0.35, -this.normal.dot(this.down)), c.maximumSuspensionForceN);
         if (load > 0) {
           inContact = true;
-          if (this.surfaceProvider) {
-            pose.surface = this.surfaceProvider(this.point.x, this.point.z, index);
-            gripFactor *= SURFACES[pose.surface].gripFactor;
-            rollingFactor = SURFACES[pose.surface].rollingFactor;
+          if (this.surfaceProvider) pose.surface = this.surfaceProvider(this.point.x, this.point.z, index);
+          gripFactor *= SURFACES[pose.surface].gripFactor;
+          let rollingFactor = SURFACES[pose.surface].rollingFactor;
+          if (this.wetness > 0) {
+            gripFactor *= wetGripFactor(pose.surface, this.wetness);
+            rollingFactor *= wetRollingFactor(pose.surface, this.wetness);
+            // L'aquaplanage ne concerne que les revêtements durs : sur l'herbe ou le gravier l'eau s'infiltre.
+            if (!SURFACES[pose.surface].loose) gripFactor *= aquaplaningGripFactor(speedMps, this.wetness, this.wear[index]);
           }
           groundedWheels += 1;
           pending.point.copy(this.point);
@@ -514,7 +533,7 @@ export class VehicleSimulation {
       pose.spinRad -= pose.omegaRadPerS * dt;
       const thermal = stepTireThermal(
         { surfaceC: pose.temperatureC, carcassC: pose.carcassTemperatureC },
-        { slidingPowerW, hysteresisPowerW, speedMps, ambientC: c.ambientTemperatureC },
+        { slidingPowerW, hysteresisPowerW, speedMps, ambientC: this.airC === null ? c.ambientTemperatureC : effectiveAmbientC(this.airC, this.wetness) },
         this.thermalParams, dt,
       );
       pose.temperatureC = thermal.surfaceC;

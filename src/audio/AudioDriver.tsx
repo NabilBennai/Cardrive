@@ -21,6 +21,9 @@ interface AudioDriverProps {
   telemetryRef: React.RefObject<VehicleTelemetry>;
   /** Poses de roues du solveur : donnent la surface sous chaque roue. */
   wheelPosesRef: React.RefObject<WheelPose[] | null>;
+  /** Humidité de la piste et intensité de la pluie (0..1), pour le bruit de l'eau. */
+  environmentRef: React.RefObject<{ wetness: number; airC: number }>;
+  rainIntensity: number;
   vehicle: VehicleConfig;
   /** Identifiant du catalogue (détermine le caractère du moteur) ; null pour le prototype. */
   carId: string | null;
@@ -33,7 +36,7 @@ interface AudioDriverProps {
  * les chocs (variation brutale de vitesse du châssis en un pas physique) qu'il publie sur le bus de ressenti pour les sons,
  * les étincelles et le tremblement de caméra. Ne rend rien.
  */
-export function AudioDriver({ bodyRef, telemetryRef, wheelPosesRef, vehicle, carId, paused, respawnVersion }: AudioDriverProps) {
+export function AudioDriver({ bodyRef, telemetryRef, wheelPosesRef, environmentRef, rainIntensity, vehicle, carId, paused, respawnVersion }: AudioDriverProps) {
   const audio = getGameAudio();
   const profile = useMemo(() => soundProfileFor(carId), [carId]);
   const previousVelocity = useRef<{ x: number; y: number; z: number } | null>(null);
@@ -80,6 +83,7 @@ export function AudioDriver({ bodyRef, telemetryRef, wheelPosesRef, vehicle, car
     audio.update({
       rpm: telemetry.engineRpm, idleRpm: vehicle.idleRpm, maxRpm: vehicle.maximumRpm, throttle: telemetry.throttle, gear: telemetry.gear,
       speedMps: telemetry.speedMps, slip: telemetry.slip, groundedWheels: telemetry.groundedWheels, looseShare,
+      rain: rainIntensity, wetness: environmentRef.current.wetness,
     }, profile);
     frames.current += 1;
     if (frames.current % DEBUG_PUBLISH_EVERY_FRAMES === 0) perfStats.audio = audio.debug();

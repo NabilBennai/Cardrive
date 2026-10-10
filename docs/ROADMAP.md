@@ -234,9 +234,14 @@ Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout :
 - Vérifié : 8 tests (modèle pur, consommation et masse du collider, pneus usés freinant ≥ 15 % plus loin, remise à neuf, panne sèche, désactivé par défaut) ; e2e dans le navigateur (détails et bouton).
 - **Limites** : les adversaires ne s'usent pas et ne consomment pas ; pas d'arrêt au stand dans la course (le bouton de pause tient lieu de ravitaillement) ; l'usure ne dépend pas encore de la surface (R-3.1) ni de la météo ; voiture électrique : pas de batterie modélisée.
 
-### R-3.6 Météo et état de la piste — L ⬜
-- Pluie : réduction du grip (facteur global puis par zone mouillée), aquaplanage au-delà d’une vitesse dépendant de la hauteur d’eau, séchage de la trajectoire. Température de l’air et de la piste influençant l’échauffement des pneus (le paramètre `ambientTemperatureC` existe déjà).
-- **Dépend de** : R-3.1 ; coût visuel : voir R-4.4.
+### R-3.6 Météo et état de la piste 🟡 (humidité globale)
+- **Réglages** : pluie (sec, légère, forte) et température de l'air (10, 20, 32 °C), dans l'écran des circuits et le menu pause, mémorisés. Le changement en cours de partie est progressif.
+- **Humidité de la piste** (0..1) suivie avec le temps de simulation : monte vers un plafond (0,55 sous pluie légère, 1 sous forte pluie, plus vite sous la forte) et sèche en ≈ 3 minutes sans pluie. Une partie lancée sous la pluie démarre sur piste déjà mouillée.
+- **Physique** : l'adhérence mouillée vaut jusqu'à 62 % de la sèche sur asphalte (herbe 55 %, gravier 78 %), résistance au roulement accrue sur sol meuble ; **aquaplanage** au-delà d'une vitesse qui baisse avec l'épaisseur d'eau (2 mm au maximum) et l'usure des pneus : ≈ 26 m/s sous forte pluie, nul sous pluie légère ; l'eau refroidit pneus et piste (jusqu'à −6 °C) ; la température de l'air donne la température de départ des pneus.
+- **Rendu et son** : pluie en traînées, brouillard et lumière plus sombres, asphalte plus sombre et plus lisse, gerbes d'eau derrière les roues, bruit de pluie et chuintement des pneus ; message « Piste mouillée / détrempée · risque d'aquaplanage ». 100 img/s mesurées sous forte pluie avec gerbes (rendu matériel, plafonné).
+- **Pilotes automatiques** : ils ralentissent selon l'humidité (vitesse en virage ∝ √adhérence) et bornent leur vitesse à 5 m/s au-dessus du seuil d'aquaplanage. Mesuré (tours valides, vrai solveur) : berline sport à Monza **+44 %** sous forte pluie ; monoplace à slicks à Suzuka **+15 %** sous pluie légère. **Sous forte pluie, la monoplace à slicks est ingérable** (aquaplanage dès ≈ 95 km/h, le pilote automatique n'y boucle aucun tour) : il n'y a pas de pneus pluie.
+- **Absents** : humidité par zone et « trajectoire sèche » qui se forme (l'humidité est la même partout, pas de flaques), pneus pluie / intermédiaires, jour et nuit, ciel (R-4.4), pluie sur les routes réelles (le sol y reste visuellement sec, seule la physique change).
+- Vérifié : 8 tests de modèle et de solveur (montée et séchage, grip, aquaplanage, freinage mouillé ≥ ×1,3 à 28 m/s et plus pénalisant à 40 m/s, température), 2 tests de tours complets, e2e (réglage mémorisé, message, rendu sous forte pluie). L'aspect visuel est jugé sur une capture seulement.
 
 ### R-3.7 Dégâts et collisions — L ⬜
 - Dégâts mécaniques (perte de puissance, déséquilibre de direction, pneu qui crève) selon l’énergie d’impact, et déformation visuelle simple (déplacement de sommets du modèle). Le collider reste un pavé : ne pas viser BeamNG.

@@ -9,11 +9,14 @@
 
 import type { PlanarPoint } from '../circuits/circuitGeometry.ts';
 import type { VehicleConfig, VehicleInput } from '../shared/types.ts';
+import { aquaplaningSpeedMps, wetGripFactor } from '../world/weather/weatherModel.ts';
 import { TrackProjector } from './trackProjector.ts';
 
 const GRAVITY = 9.81;
 const AIR_DENSITY_KG_M3 = 1.225;
 const AERO_GRIP_EFFECTIVENESS = 0.7;
+/** Marge (m/s) au-delà de la vitesse d'aquaplanage que le pilote s'autorise : l'adhérence perdue y est encore partielle (transition sur 8 m/s). */
+const AQUAPLANING_MARGIN_MPS = 5;
 /** Fraction de l'adhérence latérale estimée réellement utilisée : < 1 laisse de la marge face aux erreurs de modèle. */
 const BASE_GRIP_USE = 0.7;
 const BRAKE_USE = 0.65;
@@ -148,6 +151,7 @@ export class AiDriver {
   /** Facteur (0..1) appliqué à l'adhérence supposée : baisse quand la voiture glisse en virage, remonte lentement ensuite. */
   private gripScale = 1;
   private throttleOut = 0;
+  private wetness = 0;
   private readonly spacingM: number;
 
   constructor(private readonly centerline: readonly PlanarPoint[], lengthM: number, private readonly profile: AiProfile) {
@@ -155,6 +159,9 @@ export class AiDriver {
     this.plan = buildSpeedPlan(centerline, lengthM, profile);
     this.spacingM = lengthM / centerline.length;
   }
+
+  /** Humidité de la piste (0..1) : le pilote ralentit en conséquence et évite de dépasser la vitesse d'aquaplanage de plus de AQUAPLANING_MARGIN_MPS. */
+  setTrackWetness(wetness: number): void { this.wetness = wetness; }
 
   /** À appeler après une remise sur la grille ou une téléportation : la prochaine projection cherchera sur tout le circuit. */
   reset(): void { this.hint = null; this.gripScale = 1; this.throttleOut = 0; }
@@ -187,7 +194,9 @@ export class AiDriver {
     if (slip > CORNER_SLIDE_SLIP && Math.abs(steering) > 0.25) this.gripScale = Math.max(MIN_GRIP_SCALE, this.gripScale - GRIP_LOSS_PER_S * dtS);
     else this.gripScale = Math.min(1, this.gripScale + GRIP_RECOVERY_PER_S * dtS);
     // v² ∝ adhérence : la vitesse cible suit la racine du facteur ; ligne droite (cible au plafond) intacte tant que le facteur reste proche de 1.
-    const targetSpeed = this.targetSpeedAt(projection.sM + Math.max(0, state.speedMps) * SPEED_LEAD_S) * Math.sqrt(this.gripScale);
+    const wetScale = Math.sqrt(wetGripFactor('asphalt', this.wetness));
+    const planned = this.targetSpeedAt(projection.sM + Math.max(0, state.speedMps) * SPEED_LEAD_S) * Math.sqrt(this.gripScale) * wetScale;
+    const targetSpeed = Math.min(planned, aquaplaningSpeedMps(this.wetness, 0) + AQUAPLANING_MARGIN_MPS);
     const error = targetSpeed - state.speedMps;
     const throttle = Math.max(0, Math.min(1, error * 0.6));
     const brake = error < -1 ? Math.max(0, Math.min(1, (-error - 1) * 0.35)) : 0;

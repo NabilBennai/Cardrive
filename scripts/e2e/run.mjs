@@ -586,6 +586,35 @@ try {
     return details.replace(/\s+/g, ' ').slice(0, 120);
   });
 
+  await scenario('Pluie : piste détrempée, gerbes d\'eau, météo mémorisée', async () => {
+    try {
+      await home(page);
+      await page.click('Circuits F1 2026');
+      await page.waitFor("document.querySelector('.circuit-card')", 'le catalogue de circuits');
+      if (!(await page.click('Forte pluie'))) throw new Error('Choix « Forte pluie » introuvable.');
+      const saved = await page.eval("localStorage.getItem('cardrive.weather') ?? ''");
+      if (!saved.includes('heavy')) throw new Error(`Météo non mémorisée (« ${saved} »).`);
+      if (!(await page.click('Singapour'))) throw new Error('Circuit de Singapour introuvable.');
+      await page.waitFor("document.querySelector('.lap-hud')", 'le chrono');
+      await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement de la scène', 90_000);
+      await page.waitFor("document.querySelector('.wet-pill')", 'le message de piste mouillée', 20_000);
+      const message = await page.eval("document.querySelector('.wet-pill')?.textContent ?? ''");
+      if (!/détrempée/.test(message)) throw new Error(`Message inattendu : « ${message} ».`);
+      await page.key('keyDown', 'KeyW', 'w');
+      await sleep(4_000);
+      writeFileSync(join(outputDir, 'pluie.png'), await page.screenshot());
+      await setPerfOverlay(page, true);
+      await sleep(1_800);
+      const perf = await readPerf(page);
+      await setPerfOverlay(page, false);
+      await page.key('keyUp', 'KeyW', 'w');
+      assertNoProblems(page, 'pluie');
+      return `${message} · ${perf.fps.toFixed(0)} img/s sous forte pluie avec gerbes d'eau`;
+    } finally {
+      await page.eval("localStorage.removeItem('cardrive.weather')");
+    }
+  });
+
   await scenario("Choix d'un véhicule (Camion) et conduite à Singapour", async () => {
     await home(page);
     await page.click('Garage');

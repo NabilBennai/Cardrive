@@ -50,6 +50,8 @@ interface GenericCarProps {
   wearEnabled?: boolean;
   /** Incrémenté pour changer les pneus et refaire le plein. */
   serviceVersion?: number;
+  /** Conditions du moment, partagées par toutes les voitures de la scène. */
+  environmentRef?: React.RefObject<{ wetness: number; airC: number }>;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
@@ -374,9 +376,9 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef, drivesClock, respawnPoseRef, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion }: GenericCarProps) {
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef, drivesClock, respawnPoseRef, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion, environmentRef }: GenericCarProps) {
   const wheelPosesRef = useRef(initialWheelPoses(config));
-  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep, drivesClock, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion });
+  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep, drivesClock, surfaceAt, tractionControl, transmission, wearEnabled, serviceVersion, environmentRef });
   const previousRespawnVersion = useRef(respawnVersion);
   // Après useVehiclePhysics (qui installe le tableau de poses du solveur) : on publie ce même tableau.
   useLayoutEffect(() => { if (wheelPosesOutRef) wheelPosesOutRef.current = wheelPosesRef.current; }, [wheelPosesOutRef]);

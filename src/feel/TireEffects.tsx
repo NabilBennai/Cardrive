@@ -13,9 +13,14 @@ import { SkidBuffer } from './SkidBuffer';
 const SMOKE_CAPACITY = 240;
 const SPARK_CAPACITY = 160;
 const DUST_CAPACITY = 320;
+const SPRAY_CAPACITY = 320;
 /** Vitesse (m/s) au-dessous de laquelle une roue sur sol meuble ne soulève rien, et plafond d'émission (particules par seconde et par roue). */
 const DUST_MIN_SPEED_MPS = 3;
 const DUST_MAX_RATE = 38;
+/** Humidité en dessous de laquelle la piste ne projette pas d'eau, vitesse minimale (m/s) et débit maximal (particules par seconde et par roue). */
+const SPRAY_MIN_WETNESS = 0.2;
+const SPRAY_MIN_SPEED_MPS = 7;
+const SPRAY_MAX_RATE = 34;
 const SKID_QUADS = 6_000;
 /** Hauteur (m) des traces au-dessus du point de contact : au-dessus de l'asphalte et des vibreurs (≈ 1,6 cm), sans flotter visiblement. */
 const SKID_LIFT_M = 0.03;
@@ -26,6 +31,8 @@ const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
 interface TireEffectsProps {
   wheelPosesRef: React.RefObject<WheelPose[] | null>;
+  /** Humidité de la piste : au-delà d'un film d'eau, les roues projettent de l'eau. */
+  environmentRef?: React.RefObject<{ wetness: number }>;
   bodyRef: React.RefObject<RapierRigidBody | null>;
   /** Vrai quand la physique est à l'arrêt : les effets se figent (aucune émission, aucun vieillissement). */
   paused: boolean;
@@ -95,6 +102,40 @@ export function OffRoadDust({ wheelPosesRef, bodyRef, paused }: TireEffectsProps
   });
 
   return <ParticleLayer pool={pool} color="#a39b7a" />;
+}
+
+/** Gerbes d'eau soulevées par les roues sur une piste mouillée : proportionnelles à la vitesse et à l'humidité. */
+export function WheelSpray({ wheelPosesRef, bodyRef, environmentRef, paused }: TireEffectsProps) {
+  const pool = useMemo(() => new ParticlePool(SPRAY_CAPACITY, { gravityY: -0.6, drag: 1.1, fadeIn: 0.05 }), []);
+  const carry = useRef<number[]>([]);
+  useEffect(() => originShiftChannel.subscribe((shift) => pool.shift(shift.dx, shift.dy, shift.dz)), [pool]);
+
+  useFrame((_, delta) => {
+    if (paused) return;
+    const dt = Math.min(delta, MAX_STEP_S);
+    const poses = wheelPosesRef.current;
+    const body = bodyRef.current;
+    const wetness = environmentRef?.current.wetness ?? 0;
+    if (poses && body && wetness > SPRAY_MIN_WETNESS) {
+      const velocity = body.linvel();
+      const speed = Math.hypot(velocity.x, velocity.z);
+      poses.forEach((pose, index) => {
+        const sprays = pose.grounded && !SURFACES[pose.surface].loose && speed > SPRAY_MIN_SPEED_MPS;
+        carry.current[index] = (carry.current[index] ?? 0) + (sprays ? Math.min(SPRAY_MAX_RATE, speed * wetness * 1.1) * dt : 0);
+        while (carry.current[index] >= 1) {
+          carry.current[index] -= 1;
+          pool.spawn({
+            x: pose.contactX + rand(-0.12, 0.12), y: pose.contactY + 0.08, z: pose.contactZ + rand(-0.12, 0.12),
+            vx: velocity.x * 0.12 + rand(-0.8, 0.8), vy: rand(0.5, 1.5), vz: velocity.z * 0.12 + rand(-0.8, 0.8),
+            life: rand(0.5, 0.95), sizeStart: rand(0.25, 0.45), sizeEnd: rand(1.1, 1.9), alpha: 0.2,
+          });
+        }
+      });
+    }
+    pool.update(dt);
+  });
+
+  return <ParticleLayer pool={pool} color="#cfdae2" />;
 }
 
 /** Étincelles projetées à l'arrière du point d'impact lors d'un choc (voir sparkCount : rien pour un contact léger). */
@@ -173,6 +214,7 @@ export function TireEffects(props: TireEffectsProps) {
       <SkidMarks wheelPosesRef={props.wheelPosesRef} paused={props.paused} />
       <TireSmoke {...props} />
       <OffRoadDust {...props} />
+      <WheelSpray {...props} />
       <ImpactSparks paused={props.paused} />
     </>
   );

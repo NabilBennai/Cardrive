@@ -1,5 +1,5 @@
 import {
-  clamp, engineVoiceParams, impactParams, rollingNoiseParams, tireSquealParams, volumeToGain, windNoiseParams,
+  clamp, engineVoiceParams, impactParams, rainNoiseParams, rollingNoiseParams, tireSquealParams, volumeToGain, windNoiseParams,
   type EngineSoundProfile, type EngineSoundState,
 } from './audioModel.ts';
 import { DEFAULT_AUDIO_SETTINGS, type AudioSettings } from './audioSettings.ts';
@@ -17,6 +17,9 @@ export interface GameAudioFrame {
   groundedWheels: number;
   /** Part (0..1) des roues au sol qui roulent sur un sol meuble (gravier, herbe). */
   looseShare: number;
+  /** Intensité de la pluie (0..1) et humidité de la piste (0..1). */
+  rain: number;
+  wetness: number;
 }
 
 /** Constante de temps (s) du lissage des paramètres : assez courte pour suivre le régime, assez longue pour éviter les « clics ». */
@@ -78,6 +81,8 @@ export class GameAudio {
   private rollingGain!: GainNode;
   private windFilter!: BiquadFilterNode;
   private windGain!: GainNode;
+  private rainFilter!: BiquadFilterNode;
+  private rainGain!: GainNode;
 
   private lastDebug: GameAudioDebug = { state: 'idle', fundamentalHz: 0, engineGain: 0, squealGain: 0, levelDb: -120 };
 
@@ -170,9 +175,12 @@ export class GameAudio {
     this.squealGain.gain.setTargetAtTime(squeal.gain, now, tc);
     this.squealTone.frequency.setTargetAtTime(squeal.hz, now, tc);
     this.squealToneGain.gain.setTargetAtTime(squeal.gain * 0.35, now, tc);
-    const rolling = rollingNoiseParams(frame.speedMps, frame.groundedWheels, frame.looseShare);
+    const rolling = rollingNoiseParams(frame.speedMps, frame.groundedWheels, frame.looseShare, frame.wetness);
     this.rollingFilter.frequency.setTargetAtTime(rolling.hz, now, tc);
     this.rollingGain.gain.setTargetAtTime(rolling.gain, now, tc);
+    const rain = rainNoiseParams(frame.rain);
+    this.rainFilter.frequency.setTargetAtTime(rain.hz, now, 0.3);
+    this.rainGain.gain.setTargetAtTime(rain.gain, now, 0.3);
     const wind = windNoiseParams(frame.speedMps);
     this.windFilter.frequency.setTargetAtTime(wind.hz, now, tc);
     this.windGain.gain.setTargetAtTime(wind.gain, now, tc);
@@ -236,7 +244,7 @@ export class GameAudio {
     const ctx = this.ctx;
     if (!ctx) return;
     const now = ctx.currentTime;
-    for (const gain of [this.engineVoiceGain, this.intakeGain, this.squealGain, this.squealToneGain, this.rollingGain, this.windGain]) {
+    for (const gain of [this.engineVoiceGain, this.intakeGain, this.squealGain, this.squealToneGain, this.rollingGain, this.windGain, this.rainGain]) {
       gain.gain.setTargetAtTime(0, now, 0.04);
     }
     this.lastDebug.engineGain = 0;
@@ -363,6 +371,15 @@ export class GameAudio {
     const wind = this.noiseSource();
     wind.connect(this.windFilter).connect(this.windGain).connect(this.effectsBus);
     wind.start();
+
+    this.rainFilter = ctx.createBiquadFilter();
+    this.rainFilter.type = 'bandpass';
+    this.rainFilter.Q.value = 0.4;
+    this.rainGain = ctx.createGain();
+    this.rainGain.gain.value = 0;
+    const rainSource = this.noiseSource();
+    rainSource.connect(this.rainFilter).connect(this.rainGain).connect(this.effectsBus);
+    rainSource.start();
 
     this.applyVolumes();
     // Le contexte démarre souvent « suspended » : on le reprend dès que possible (le geste a eu lieu si on est ici).

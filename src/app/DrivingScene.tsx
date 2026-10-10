@@ -11,6 +11,9 @@ import type { LapTimerEvent } from '../race/lapTimer';
 import type { Ghost } from '../race/ghost';
 import type { GridSlot } from '../race/grid';
 import { createCircuitSurface } from '../race/circuitSurface';
+import { Rain } from '../world/weather/Rain';
+import { WeatherDriver, type Environment } from '../world/weather/WeatherDriver';
+import { AIR_TEMPERATURE_C, initialWetness, rainIntensity, type WeatherSettings } from '../world/weather/weatherModel';
 import { OpponentCar, type OpponentSpec } from '../race/OpponentCar';
 import { RolloverGuard } from '../race/RolloverGuard';
 import { PlayerAutopilot } from '../race/PlayerAutopilot';
@@ -28,6 +31,9 @@ import { useFloatingOrigin } from '../world/streaming/useFloatingOrigin';
 import type { StreamedChunk } from '../world/streaming/chunkOwnership';
 import type { RoadSpawnPose } from '../world/roads/spawnPlacement';
 import { headingToQuaternion, vehicleSpawnHeightM, VEHICLE_FIXED_STEP_S } from '../vehicle/physics/vehicleBody';
+
+const DRY_WEATHER: WeatherSettings = { rain: 'dry', temperature: 'mild' };
+const ignoreWetness = () => { /* l'interface n'est pas informée de l'humidité */ };
 
 export type DrivingWorld =
   | { kind: 'demo' }
@@ -71,6 +77,9 @@ interface DrivingSceneProps {
   /** Voiture du joueur retournée (état) et remise en piste d'office en course. */
   onFlippedChange?: (flipped: boolean) => void;
   onAutoRecover?: () => void;
+  /** Conditions : pluie et température de l'air ; l'humidité de la piste est suivie par la scène et remontée à l'interface. */
+  weather?: WeatherSettings;
+  onWetnessChange?: (wetness: number) => void;
   /** Crochet de test (`?autopilot`) : le pilote automatique conduit la voiture du joueur sur un circuit. */
   autopilot?: boolean;
   /** Course contre des adversaires pilotés par l'IA (circuits uniquement). */
@@ -84,13 +93,16 @@ interface DrivingSceneProps {
 }
 
 export function DrivingScene({
-  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot, tractionControl, transmission, wearEnabled, serviceVersion, onFlippedChange, onAutoRecover,
+  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot, tractionControl, transmission, wearEnabled, serviceVersion, weather = DRY_WEATHER, onWetnessChange = ignoreWetness, onFlippedChange, onAutoRecover,
 }: DrivingSceneProps) {
   // Poses de roues du solveur, partagées avec les effets de pneus (fumée, traces).
   const wheelPosesRef = useRef<WheelPose[] | null>(null);
   // Course : corps des adversaires (pour le chef de course), signal de départ et point de reprise du joueur.
   // Sur circuit, l'herbe et le gravier hors de la piste adhèrent moins que l'asphalte.
   const playerSurface = useMemo(() => (world.kind === 'circuit' ? createCircuitSurface(world.track) : undefined), [world]);
+  // Conditions partagées par toutes les voitures : partent de l'état d'équilibre de la pluie choisie (piste déjà mouillée).
+  const environmentRef = useRef<Environment>({ wetness: initialWetness(weather.rain), airC: AIR_TEMPERATURE_C[weather.temperature] });
+  const rain = rainIntensity(weather.rain);
   const goRef = useRef({ go: false });
   const playerRespawnPoseRef = useRef<VehicleSpawnPose | null>(null);
   const opponentBodies = useMemo(() => (field ? field.opponents.map((opponent) => ({ id: opponent.id, bodyRef: createRef<RapierRigidBody>() })) : []), [field]);
@@ -119,17 +131,17 @@ export function DrivingScene({
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       fallback={<div className="fatal-state">WebGL n’est pas disponible dans ce navigateur.</div>}
     >
-      <color attach="background" args={['#101918']} />
-      <fog attach="fog" args={['#101918', 58, 145]} />
-      <ambientLight intensity={0.72} />
-      <hemisphereLight args={['#dbe5cb', '#27352d', 1.25]} />
+      <color attach="background" args={[rain > 0 ? '#151c20' : '#101918']} />
+      <fog attach="fog" args={[rain > 0 ? '#151c20' : '#101918', 58 - 26 * rain, 145 - 55 * rain]} />
+      <ambientLight intensity={0.72 - 0.16 * rain} />
+      <hemisphereLight args={['#dbe5cb', '#27352d', 1.25 - 0.3 * rain]} />
       <FollowingSun bodyRef={bodyRef} />
       <Physics gravity={[0, -9.81, 0]} timeStep={VEHICLE_FIXED_STEP_S} interpolate={false} paused={paused}>
         <Suspense fallback={null}>
           {world.kind === 'demo' ? (
             <DemoTrack />
           ) : world.kind === 'circuit' ? (
-            <CircuitScene track={world.track} />
+            <CircuitScene track={world.track} environmentRef={environmentRef} />
           ) : (
             <StreamingRoadNetwork
               worldAnchor={world.worldAnchor}
@@ -152,6 +164,7 @@ export function DrivingScene({
             wheelPosesOutRef={wheelPosesRef}
             respawnPoseRef={field ? playerRespawnPoseRef : undefined}
             surfaceAt={playerSurface}
+            environmentRef={environmentRef}
             tractionControl={tractionControl}
             transmission={transmission}
             wearEnabled={wearEnabled}
@@ -159,13 +172,15 @@ export function DrivingScene({
           />
           <FloatingOriginApplier origin={floatingOrigin} />
           <ChaseCamera bodyRef={bodyRef} snapVersion={respawnVersion} effects={cameraEffects} />
-          <TireEffects wheelPosesRef={wheelPosesRef} bodyRef={bodyRef} paused={paused} />
-          <AudioDriver bodyRef={bodyRef} telemetryRef={telemetryRef} wheelPosesRef={wheelPosesRef} vehicle={vehicle} carId={carId} paused={paused} respawnVersion={respawnVersion} />
+          <TireEffects wheelPosesRef={wheelPosesRef} bodyRef={bodyRef} environmentRef={environmentRef} paused={paused} />
+          <WeatherDriver weather={weather} environmentRef={environmentRef} onWetnessChange={onWetnessChange} />
+          {rain > 0 && <Rain intensity={rain} />}
+          <AudioDriver bodyRef={bodyRef} telemetryRef={telemetryRef} wheelPosesRef={wheelPosesRef} environmentRef={environmentRef} rainIntensity={rain} vehicle={vehicle} carId={carId} paused={paused} respawnVersion={respawnVersion} />
           {world.kind === 'circuit' && race && (
             <RaceDriver track={world.track} bodyRef={bodyRef} respawnVersion={respawnVersion} referenceProfileS={race.referenceProfileS} ghost={race.ghost} ghostHeightM={vehicleSpawnHeightM(vehicle) * 0.6} onLapGhost={race.onLapGhost} onSnapshot={race.onSnapshot} onEvent={race.onEvent} />
           )}
           {world.kind === 'circuit' && autopilot && (
-            <PlayerAutopilot track={world.track} config={vehicle} bodyRef={bodyRef} input={input} telemetryRef={telemetryRef} respawnVersion={respawnVersion} />
+            <PlayerAutopilot track={world.track} config={vehicle} bodyRef={bodyRef} input={input} telemetryRef={telemetryRef} respawnVersion={respawnVersion} environmentRef={environmentRef} />
           )}
           {world.kind === 'circuit' && field && (
             <>
@@ -178,6 +193,7 @@ export function DrivingScene({
                   modelUrl={field.opponentModelUrl}
                   bodyRef={opponentBodies[index].bodyRef}
                   goRef={goRef}
+                  environmentRef={environmentRef}
                 />
               ))}
               <RaceDirector
