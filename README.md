@@ -33,9 +33,11 @@ Une fonctionnalité est terminée quand ses tests passent, que `calibrate` reste
 src/
   app/          écrans (menu, garage, circuits, lieu), scène de conduite
   vehicle/      solveur (pneus, transmission), profils par véhicule, catalogue, rendu
-  world/        routes, bâtiments, eau, trottoirs, streaming de chunks
+  world/        routes, bâtiments, eau, trottoirs, streaming de chunks, météo (pluie)
   circuits/     tracés des 24 circuits et leur géométrie
-  geo/ map/     projection, origine flottante, Overpass, géocodage, cache
+  race/         chronomètre, records, fantôme, pilotes automatiques, grille et classement
+  audio/ feel/  son synthétisé, particules, traces, caméra
+  geo/ map/     projection, origine flottante, altitudes (étude), Overpass, géocodage, cache
   ui/ debug/    tableau de bord, mini-cartes, panneau de performance
 scripts/        calibration, mesures, tests de bout en bout (e2e/)
 docs/           architecture, feuille de route, performance
@@ -47,11 +49,14 @@ docs/           architecture, feuille de route, performance
 - [Dossier d'architecture](docs/architecture/README.md) : décisions de conception.
 - [Modèle de pneu et de transmission](docs/architecture/step-6-tire-model.md).
 - [Performance](docs/PERFORMANCE.md) : budgets, mesures, comment mesurer.
+- [Altitudes](docs/ELEVATION.md) : source choisie, licences, mesures sur 5 circuits.
 
 ## Déploiement
 
 Application statique, sans backend. `vercel.json` configure Vercel (`npm run build`, sortie `dist/`, en-têtes de cache). Le workflow `.github/workflows/ci.yml` exécute lint, typecheck, tests et build à chaque push.
 
 ## Données et licences
+
+Altitudes (étude, pas encore utilisées en jeu) : AWS Terrain Tiles, voir [docs/ELEVATION.md](docs/ELEVATION.md).
 
 Voir [NOTICE](NOTICE) : © contributeurs OpenStreetMap (ODbL), tracés de circuits `bacinger/f1-circuits` (MIT), modèles Kenney Car Kit (CC0).

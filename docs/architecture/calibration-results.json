@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-10T14:20:35.813Z",
+  "generatedAt": "2026-10-10T17:29:24.588Z",
   "environment": {
     "node": "v22.23.1",
     "platform": "win32",
@@ -137,7 +137,12 @@
     "ambientTemperatureC": 20,
     "tireOptimalTemperatureC": 80,
     "tireTemperatureFalloffC": 55,
-    "tireMinGripMultiplier": 0.5
+    "tireMinGripMultiplier": 0.5,
+    "downforceClAM2": 0,
+    "downforceFrontShare": 0.45,
+    "differentialLock": 0,
+    "tireWearEnergyMJ": 8,
+    "fuelCapacityKg": 45
   },
   "note": "Rapier headless, synthetic render cadence; no GPU/FPS benchmark or browser input validation.",
   "checks": {

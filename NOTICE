@@ -13,4 +13,6 @@ Modèles de voitures (public/models/cars/)
   Car Kit de Kenney — https://kenney.nl/assets/car-kit — licence CC0 1.0 (domaine public).
   Texte de la licence : public/models/cars/LICENSE-kenney-car-kit.txt
 
+Altitudes (prévues, étude seulement pour l'instant) : AWS Terrain Tiles — SRTM, 3DEP, GMTED2010 (domaine public, USGS), EU-DEM (Copernicus). Voir docs/ELEVATION.md.
+
 Bibliothèques : voir package.json (three.js, React Three Fiber, Rapier, React, Vite — licences MIT / Apache-2.0).

@@ -1,6 +1,6 @@
 # Cardrive — Feuille de route
 
-Dernière mise à jour : 10 octobre 2026. Ce document complète le [dossier d’architecture](architecture/README.md) (décisions de conception et plan initial en 7 étapes) : il décrit **l’état réel**, la **dette connue** et les **évolutions prévues**, avec pour chacune la raison, l’approche, les critères de fin, l’effort et les risques.
+Dernière mise à jour : 10 octobre 2026 (fin de la Phase 3 hors relief, étude d'altitude faite). Ce document complète le [dossier d’architecture](architecture/README.md) (décisions de conception et plan initial en 7 étapes) : il décrit **l’état réel**, la **dette connue** et les **évolutions prévues**, avec pour chacune la raison, l’approche, les critères de fin, l’effort et les risques.
 
 Légende des efforts (estimations indicatives pour une personne, à réviser au démarrage) : **S** < 1 jour · **M** 1 à 3 jours · **L** 1 à 2 semaines · **XL** > 2 semaines.
 Légende des statuts : ✅ livré · 🟡 partiel · ⬜ à faire.
@@ -17,7 +17,7 @@ Légende des statuts : ✅ livré · 🟡 partiel · ⬜ à faire.
 8. [Phase 5 — Véhicules et personnalisation](#8-phase-5--véhicules-et-personnalisation)
 9. [Phase 6 — Interface, commandes et accessibilité](#9-phase-6--interface-commandes-et-accessibilité)
 10. [Phase 7 — Diffusion et en ligne](#10-phase-7--diffusion-et-en-ligne)
-11. [Séquencement proposé](#11-séquencement-proposé)
+11. [Séquencement proposé](#11-séquencement-proposé) (précédé de [l'état d'avancement et des prochaines étapes](#10-bis-état-davancement-et-où-reprendre-10-octobre-2026))
 12. [Registre des risques](#12-registre-des-risques)
 13. [Hors périmètre](#13-hors-périmètre)
 14. [Définition de « terminé »](#14-définition-de--terminé-)
@@ -41,7 +41,11 @@ Légende des statuts : ✅ livré · 🟡 partiel · ⬜ à faire.
 | Physique par véhicule | Profil réel (masse, gabarit, puissance, rapports, grip, freins, aéro, direction, transmission) → configuration complète | ✅ | `vehicleProfiles.ts` |
 | Circuits F1 2026 | 24 tracés (piste, vibreurs, murs, ligne de départ), mini-carte hors ligne, sélecteur avec vignettes | ✅ | `src/circuits/` |
 | Interface | Menu, garage, lieux récents, HUD (vitesse, rapport, régime, détails avec `T`), pause, tactile | ✅ | `src/app/`, `src/ui/` |
-| Qualité | 157 tests, 12 contrôles de calibration, 8 scénarios de bout en bout, panneau de performance (F3), CI GitHub verte | ✅ | `tests/`, `scripts/`, `src/debug/` |
+| Son et ressenti | Moteur, pneus, vent, chocs et pluie synthétisés (Web Audio, aucun fichier), fumée, traces, poussière, gerbes d'eau, étincelles, tremblement de caméra, champ de vision variable | ✅ (Phase 1) | `src/audio/`, `src/feel/` |
+| Mode course | Chronométrage à secteurs, records par circuit et véhicule, fantôme, pilotes automatiques (même solveur), grille, feux, classement, résultats | ✅ (Phase 2) | `src/race/` |
+| Physique avancée | Surfaces par roue, déportance, différentiel à glissement limité, contrôle de traction, boîte manuelle avec calage, usure des pneus, carburant, pluie et aquaplanage, dégâts optionnels, détection de retournement | ✅ (Phase 3, sauf relief) | `src/vehicle/physics/`, `src/world/weather/` |
+| Altitudes | Source choisie, module de lecture et mesures sur 5 circuits (pas encore utilisées en jeu) | 🟡 (étude R-4.1) | `src/geo/elevation.ts`, [ELEVATION.md](ELEVATION.md) |
+| Qualité | 292 tests (dont des tours complets et des courses simulées avec le vrai solveur), 12 contrôles de calibration, 16 scénarios de bout en bout (17 avec `--full-lap`), panneau de performance (F3), CI GitHub | ✅ | `tests/`, `scripts/`, `src/debug/` |
 
 ### 1.2 Chiffres de référence (prototype, pneus froids)
 
@@ -53,13 +57,18 @@ Légende des statuts : ✅ livré · 🟡 partiel · ⬜ à faire.
 
 ### 1.3 Limites connues
 
-- Monde **plat** : routes, circuits et décor n’ont aucun relief.
-- Une seule surface (asphalte sec) : l’herbe adhère comme la route.
-- Aucun son, aucun chronomètre, aucun adversaire, aucune sauvegarde de score.
-- Les modèles Kenney n’ont qu’une texture : pas de repeinture.
-- Une route appartient au chunk de son **premier nœud** (pas de découpage exact aux frontières) ; les trottoirs et l’eau compensent, pas les routes elles-mêmes.
+- Monde **plat** : routes, circuits et décor n'ont aucun relief (R-3.2 ; la source d'altitude est choisie, R-4.1).
+- Les surfaces (asphalte, gravier, herbe) n'existent que **sur circuit** ; les routes réelles et la piste de démo sont en asphalte partout, et la pluie n'y change pas l'aspect du sol.
+- Pas de jour ni de nuit, pas de ciel (R-4.4), pas de trafic ni de piétons (R-4.3).
+- Pas d'**évitement** entre voitures : les pilotes automatiques roulent sur la ligne centrale et se touchent ; ils ne subissent ni dégâts, ni usure, ni consommation ; pas de sillage.
+- Pas de pneus pluie : sous forte pluie, la monoplace à slicks est ingérable (aquaplanage dès ≈ 95 km/h).
+- Boîte manuelle sans pédale d'embrayage ; pas d'arrêt au stand dans la course ; pas de drapeaux ni de voiture de sécurité.
+- Les vitesses de pointe des monoplaces (293 et 310 km/h) restent sous leurs cibles (340 et 380 km/h) ; écart non investigué.
+- Les modèles Kenney n'ont qu'une texture : pas de repeinture. Tous les adversaires ont la carrosserie du joueur.
+- Une route appartient au chunk de son **premier nœud** (pas de découpage exact aux frontières) ; les trottoirs et l'eau compensent, pas les routes elles-mêmes.
 - Les miroirs Overpass publics sont instables et limitent les accès répétés (500, 504, 403 « liste blanche », réponse vide hors Suisse pour `osm.ch`). L'application les contourne (R-0.6) mais ne peut pas garantir un chargement : voir R-7.3.
-- La conduite réelle dans un navigateur de bureau (sensation, FPS) n’a pas été validée sur une machine de référence.
+- La conduite réelle dans un navigateur de bureau (sensation, FPS) n'a été mesurée que sur une machine (i5-13400F, RTX 4070, rendu plafonné à ≈ 100 img/s) ; les machines d'entrée de gamme et le coût de 5 adversaires hors scénario e2e restent à mesurer.
+- Aucun **réglage de sensibilité** ni remappage des touches ; le son et les effets n'ont été jugés qu'à travers des mesures et des captures, pas à l'oreille ni en jeu prolongé.
 
 ---
 
@@ -136,7 +145,7 @@ Mesurer au lieu de supposer a trouvé **trois défauts réels**, absents de tous
 
 ---
 
-## 4. Phase 1 — Son et ressenti 🟡
+## 4. Phase 1 — Son et ressenti ✅
 
 Le jeu était muet : c’est ce qui lui retirait le plus de vie. Tout est synthétisé (aucun fichier audio, donc aucune licence à suivre).
 
@@ -153,9 +162,9 @@ Le jeu était muet : c’est ce qui lui retirait le plus de vie. Tout est synth�
 ### R-1.3 Volume, mixage et accessibilité sonore ✅
 - Menu pause : volume général, moteur, pneus/vent/chocs (courbe quadratique), « Sans son » (touche M) et « Effets de caméra » ; réglages mémorisés (`cardrive.audioSettings`). Le son se coupe quand le jeu est en pause ou l’onglet masqué.
 
-### R-1.4 Retour visuel du ressenti 🟡
+### R-1.4 Retour visuel du ressenti ✅
 - Livré : fumée des pneus (puissance de frottement), traces noires au sol (anneau de 6 000 quadrilatères), étincelles aux chocs, tremblement de caméra (vibration à haute vitesse + choc qui s’éteint en 0,55 s), champ de vision de 52° à 65° selon la vitesse. Tout est désactivé par `prefers-reduced-motion` ou l’option « Effets de caméra ». Les effets suivent les recentrages d’origine flottante.
-- **Reporté** : poussière hors piste, volontairement : sans surfaces (R-3.1) elle ne saurait pas quand apparaître.
+- La poussière hors piste, reportée ici faute de surfaces, a été livrée avec R-3.1 (sol meuble) ; dernière limite : son rendu à vitesse n'a été jugé que sur capture.
 - Vérifié sur capture (Singapour, frein à main à 90 km/h) : traces et fumée visibles ; non mesuré en images/s au-delà du scénario e2e (100 img/s, plafonné).
 
 ---
@@ -268,10 +277,11 @@ Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout :
 
 ## 7. Phase 4 — Monde
 
-### R-4.1 Source d’altitude — M ⬜ (étude puis intégration)
-- **À trancher** (point déjà ouvert au dossier d’architecture) : service de tuiles d’élévation public (CORS, quotas, licence, résolution) ou jeu de données hors ligne par circuit. Pour les 24 circuits, l’altitude du départ existe déjà dans la source des tracés ; le profil complet pourrait être saisi pour les plus célèbres (Spa, Suzuka, Interlagos, COTA) et lissé pour les autres.
-- **Fin de l’étude** : décision écrite (source, licence, taille, format, cache), prototype de lecture sur une zone, estimation du coût mémoire par chunk.
-- **Dépend de** : R-3.2.
+### R-4.1 Source d’altitude ✅ (étude et prototype)
+- **Décision** (détails, mesures et licences dans [ELEVATION.md](ELEVATION.md)) : tuiles Terrarium des **Terrain Tiles d'AWS** (public, sans clé, CORS ouvert, domaine public / EU-DEM avec mention), lues par le navigateur. Un circuit = 4 à 6 tuiles, **≈ 0,4 Mio** à télécharger et **≈ 1 Mio** de mémoire, au zoom 13.
+- **Livré** : `src/geo/elevation.ts` (décodage, tuiles d'une zone, échantillonnage bilinéaire, lissage de profil, statistiques), 10 tests, et deux scripts de mesure sur le réseau (`scripts/elevation/probe.mjs`, `compare.mjs`).
+- **Constat clé** : excellent en terrain naturel (Spa 107 m de dénivelé, Interlagos 45 m, Suzuka 46 m, cohérents avec la réalité), **inutilisable tel quel sur les circuits urbains** (Monaco, Singapour : immeubles, ponts et tunnels comptés comme du sol, pentes de 85 à 163 %). Il faudra classer les 24 circuits (5 mesurés) et traiter les urbains autrement (plats ou profil saisi).
+- **Reste pour R-3.2** : chargeur navigateur avec cache, classement des circuits, maillage de sol et de routes suivant le profil, mesure du coût.
 
 ### R-4.2 Circuits plus fidèles — L ⬜
 - Largeur de piste réelle par tronçon (la largeur actuelle est estimée par circuit), épingles et chicanes affinées (le tracé à la main est approximatif en virage), voie des stands, zones d’échappatoire en gravier/herbe/asphalte, tribunes, bâtiments de stands, panneaux de distance, éclairage de nuit pour Singapour, Las Vegas, Bahreïn, Jeddah, Abou Dabi et Lusail.
@@ -366,6 +376,28 @@ Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout :
 
 ### R-7.5 Télémétrie d’usage — S/M ⬜
 - Mesures anonymes optionnelles (FPS médian, erreurs, circuits joués) avec consentement ; rien de personnel. À arbitrer selon la politique de confidentialité visée.
+
+---
+
+## 10 bis. État d'avancement et où reprendre (10 octobre 2026)
+
+**Livré dans cette série de sessions** : Phase 0 (stabiliser et mesurer), Phase 1 (son et ressenti, sauf la poussière hors piste devenue possible avec R-3.1 et livrée), Phase 2 (chrono, records, fantôme, pilotes automatiques, course ; reste R-2.6 dérive et slalom), Phase 3 (surfaces, aérodynamique, aides, boîte manuelle, usure et carburant, météo, dégâts, retournement ; reste R-3.2 relief) et l'étude R-4.1.
+
+**Prochaines étapes conseillées, dans l'ordre :**
+1. **R-3.2 Relief** : chargeur d'altitudes dans le navigateur (cache), classement des 24 circuits (naturel ou urbain ; 5 mesurés), sol et routes qui suivent le profil lissé, mesure du coût. C'est le plus gros gain de sensation restant.
+2. **R-4.4 Jour, nuit et ciel** : indépendant du relief, très visible.
+3. **R-6.1 Manettes et volants**, **R-6.3 Caméras** : la conduite au clavier limite la sensation ; les caméras (cockpit, capot) manquent.
+4. **R-2.6 Dérive et slalom**, évitement et sillage pour les pilotes automatiques (R-2.4, R-3.4).
+5. **R-7.1 Déploiement** (R-0.8 : il reste à déployer) puis R-7.2 PWA.
+
+**Comment vérifier avant de continuer** : `npm run lint`, `npm run typecheck`, `npm test` (≈ 1 minute), `npm run build`, `npm run e2e -- --gpu` (≈ 5 minutes), `npm run calibrate` (12 contrôles). `npm run e2e -- --gpu --full-lap` ajoute un tour complet piloté (≈ 4 minutes de plus).
+
+**Pièges rencontrés (à ne pas refaire)** :
+- Les constantes de calibration (adhérence, usure, consommation, profondeur d'eau) ont été **réglées par mesure** : un premier jet trop sévère (eau à 3-5 mm) rendait les tours 1,6 fois plus lents et faisait partir les monoplaces en tête-à-queue. Mesurer avant de figer.
+- Le solveur doit lire les vitesses de roue **avant** que la boucle n'en modifie aucune (différentiel) : sinon instabilité dépendante de l'ordre des roues.
+- Freiner à l'arrêt engage la marche arrière : les voitures tenues sur la grille doivent utiliser le frein à main seulement.
+- Les créneaux de test de pluie, de crevaison, de calage et de retournement sont vérifiés dans le solveur sans interface ; leur **rendu** n'a été vu que sur captures.
+- Les scripts Node de `scripts/elevation/` importent du TypeScript directement : pas de propriétés de paramètre (`constructor(readonly x)`) dans `src/geo/`.
 
 ---
 
