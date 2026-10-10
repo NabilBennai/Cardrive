@@ -64,7 +64,7 @@ export function TouchControls({ setStick, setHandbrake }: TouchControlsProps) {
         onPointerCancel={() => setHandbrake(false)}
         onPointerLeave={() => setHandbrake(false)}
       >
-        FREIN<br />MAIN
+        Frein<br />à main
       </button>
     </div>
   );

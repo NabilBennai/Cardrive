@@ -47,54 +47,57 @@ export function LocationPicker({ onChoosePlace, onUseDemoTrack, onBack }: Locati
   };
 
   return (
-    <section className="start-screen location-picker" aria-label="Choix du lieu">
-      <div className="start-copy">
-        <p className="overline"><i /> ÉTAPE 3 · ZONE RÉELLE (BÊTA)</p>
-        <h1>Choisissez<br /><em>une route.</em></h1>
-        <p className="intro-copy">Les routes viennent d’OpenStreetMap via Overpass : une requête réseau bornée à une petite zone autour de l’adresse choisie.</p>
+    <section className="screen" aria-label="Choix du lieu">
+      <div className="screen-head">
+        <button className="back-button" onClick={onBack} aria-label="Retour au menu">‹</button>
+        <div className="brand"><span className="brand-mark">C</span>Cardrive</div>
+      </div>
+      <div className="screen-body">
+        <h2>Où voulez-vous rouler ?</h2>
+        <p className="lead">Entrez une adresse ou une ville. Les routes viennent d’OpenStreetMap et se chargent autour de ce point.</p>
 
-        <div className="location-search">
+        <div className="search-field">
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Rechercher une adresse, une ville…"
+            placeholder="Adresse, ville, lieu…"
             aria-label="Rechercher une adresse"
             autoComplete="off"
+            autoFocus
           />
-          {queryLongEnough && searching && <p className="location-search-status">Recherche…</p>}
-          {queryLongEnough && searchError && <p className="location-search-status">Recherche indisponible, réessayez.</p>}
-          {queryLongEnough && results.length > 0 && (
-            <ul className="location-suggestions" role="listbox">
-              {results.map((result) => (
-                <li key={`${result.point.latitudeDeg},${result.point.longitudeDeg}`}>
-                  <button className="location-option" role="option" onClick={() => choose(result.point, result.label)}>
-                    {result.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
+        {queryLongEnough && searching && <p className="field-status">Recherche en cours…</p>}
+        {queryLongEnough && searchError && <p className="field-status">Recherche indisponible. Réessayez dans un instant.</p>}
+        {queryLongEnough && results.length > 0 && (
+          <ul className="option-list" role="listbox">
+            {results.map((result) => (
+              <li key={`${result.point.latitudeDeg},${result.point.longitudeDeg}`}>
+                <button className="option" role="option" onClick={() => choose(result.point, result.label)}>
+                  {result.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {!queryLongEnough && recents.length > 0 && (
-          <div className="location-recents">
-            <p className="location-search-status">DERNIERS LIEUX</p>
-            <ul className="location-suggestions">
+          <>
+            <p className="group-title">Derniers lieux</p>
+            <ul className="option-list">
               {recents.map((recent) => (
                 <li key={`${recent.point.latitudeDeg},${recent.point.longitudeDeg}`}>
-                  <button className="location-option" onClick={() => choose(recent.point, recent.label)}>
+                  <button className="option" onClick={() => choose(recent.point, recent.label)}>
                     {recent.label}
                   </button>
                 </li>
               ))}
             </ul>
-          </div>
+          </>
         )}
 
-        <div className="location-footer">
-          <button className="text-button" onClick={onUseDemoTrack}>PISTE DÉMO HORS LIGNE</button>
-          <button className="text-button" onClick={onBack}>RETOUR</button>
+        <div className="screen-footer">
+          <button className="btn-quiet" onClick={onUseDemoTrack}>Jouer sur la piste d’essai</button>
         </div>
       </div>
     </section>

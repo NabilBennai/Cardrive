@@ -8,13 +8,16 @@ interface CarPickerProps {
 
 export function CarPicker({ selectedId, onSelect, onBack }: CarPickerProps) {
   return (
-    <section className="start-screen car-picker" aria-label="Choix de la voiture">
-      <div className="start-copy">
-        <p className="overline"><i /> GARAGE</p>
-        <h1>Choisissez<br /><em>une voiture.</em></h1>
-        <p className="intro-copy">Modèles du Car Kit de Kenney (CC0). L'habillage change ; la conduite reste celle du prototype.</p>
+    <section className="screen" aria-label="Garage">
+      <div className="screen-head">
+        <button className="back-button" onClick={onBack} aria-label="Retour au menu">‹</button>
+        <div className="brand"><span className="brand-mark">C</span>Cardrive</div>
+      </div>
+      <div className="screen-body wide">
+        <h2>Garage</h2>
+        <p className="lead">Choisissez votre voiture. Seul l’aspect change : tous les modèles se conduisent comme le prototype. Modèles du Car Kit de Kenney (CC0).</p>
 
-        <ul className="car-grid" role="listbox" aria-label="Catalogue de voitures">
+        <ul className="car-grid" role="listbox" aria-label="Voitures">
           {CAR_CATALOG.map((car) => {
             const preview = carPreviewUrl(car);
             return (
@@ -25,7 +28,7 @@ export function CarPicker({ selectedId, onSelect, onBack }: CarPickerProps) {
                   aria-selected={car.id === selectedId}
                   onClick={() => onSelect(car.id)}
                 >
-                  {preview ? <img src={preview} alt="" loading="lazy" width={96} height={96} /> : <span className="car-card-placeholder">R-01</span>}
+                  {preview ? <img src={preview} alt="" loading="lazy" width={96} height={72} /> : <span className="car-card-placeholder">R-01</span>}
                   <span>{car.label}</span>
                 </button>
               </li>
@@ -33,8 +36,8 @@ export function CarPicker({ selectedId, onSelect, onBack }: CarPickerProps) {
           })}
         </ul>
 
-        <div className="location-footer">
-          <button className="text-button" onClick={onBack}>VALIDER</button>
+        <div className="screen-footer">
+          <button className="btn" onClick={onBack}>Valider</button>
         </div>
       </div>
     </section>

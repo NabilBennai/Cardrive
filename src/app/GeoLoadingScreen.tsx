@@ -9,19 +9,19 @@ interface GeoLoadingScreenProps {
 }
 
 const ERROR_COPY: Record<GeoLoadErrorKind, { title: string; detail: string }> = {
-  network: { title: 'Le réseau\nne répond pas.', detail: 'Impossible de joindre le fournisseur de cartes.' },
-  timeout: { title: 'Le réseau\nne répond pas.', detail: 'Le fournisseur de cartes met trop de temps à répondre.' },
-  'rate-limited': { title: 'Service\nsaturé.', detail: 'Le fournisseur limite les requêtes, réessayez plus tard.' },
-  http: { title: 'Fournisseur\nindisponible.', detail: 'Le fournisseur de cartes a répondu une erreur.' },
-  'malformed-response': { title: 'Données\ninvalides.', detail: 'La réponse du fournisseur de cartes est illisible.' },
-  'empty-result': { title: 'Aucune route\nici.', detail: 'Cette zone ne contient aucune voie carrossable. Choisissez un autre lieu.' },
+  network: { title: 'Pas de connexion aux cartes.', detail: 'Impossible de joindre le fournisseur de cartes. Vérifiez votre connexion puis réessayez.' },
+  timeout: { title: 'Le fournisseur met trop de temps.', detail: 'Le fournisseur de cartes ne répond pas assez vite. Réessayez dans un instant.' },
+  'rate-limited': { title: 'Service saturé.', detail: 'Le fournisseur limite les requêtes. Patientez un peu avant de réessayer.' },
+  http: { title: 'Fournisseur indisponible.', detail: 'Le fournisseur de cartes a renvoyé une erreur. Réessayez, ou choisissez la piste d’essai.' },
+  'malformed-response': { title: 'Données illisibles.', detail: 'La réponse du fournisseur de cartes est invalide. Réessayez dans un instant.' },
+  'empty-result': { title: 'Aucune route ici.', detail: 'Cette zone ne contient aucune route carrossable. Choisissez un autre lieu.' },
 };
 
 export function GeoLoadingScreen({ state, onRetry, onUseDemoTrack }: GeoLoadingScreenProps) {
   if (state.kind === 'loading') {
     return (
       <div className="scene-loading" role="status">
-        <i /> CHARGEMENT DE LA ZONE
+        <span className="spinner" /> Chargement de la zone…
       </div>
     );
   }
@@ -29,11 +29,10 @@ export function GeoLoadingScreen({ state, onRetry, onUseDemoTrack }: GeoLoadingS
   const copy = ERROR_COPY[state.errorKind];
   return (
     <section className="scene-error" role="alert">
-      <p className="overline"><i /> CHARGEMENT IMPOSSIBLE</p>
-      <h2>{copy.title.split('\n').map((line, index) => <span key={index}>{line}<br /></span>)}</h2>
+      <h2>{copy.title}</h2>
       <p>{copy.detail}</p>
-      <button className="start-button" onClick={onRetry}><span>RÉESSAYER</span><b>↻</b></button>
-      <button className="text-button" onClick={onUseDemoTrack}>REVENIR À LA PISTE DÉMO</button>
+      <button className="btn" onClick={onRetry}>Réessayer</button>
+      <button className="btn-quiet" onClick={onUseDemoTrack}>Jouer sur la piste d’essai</button>
     </section>
   );
 }

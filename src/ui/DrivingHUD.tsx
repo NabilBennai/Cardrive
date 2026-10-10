@@ -1,90 +1,79 @@
+import { useEffect, useState } from 'react';
 import type { VehicleTelemetry } from '../shared/types';
 
 interface DrivingHUDProps {
   telemetry: VehicleTelemetry;
   paused: boolean;
   onPause: () => void;
-  onRespawn: () => void;
   /** Étape 4, doc §8 : « signaler la limite » quand un chunk voisin tarde à charger. Non bloquant — un sol de secours garantit qu'on ne tombe jamais. */
   zoneUnavailable?: boolean;
 }
 
-const kmh = (speedMps: number) => Math.round(Math.abs(speedMps) * 3.6).toString().padStart(3, '0');
+const kmh = (speedMps: number) => Math.round(Math.abs(speedMps) * 3.6);
 
-const TIRE_LABELS = ['AVG', 'AVD', 'ARG', 'ARD'];
+const TIRE_LABELS = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'];
 // Repères approximatifs d'une fenêtre de température pneu (froid / optimal / surchauffe) :
 // cohérents avec le réglage physique (ambiant 20°C, optimal 85°C) sans y être couplés en dur.
 const tireStatus = (tempC: number) => (tempC < 55 ? 'cold' : tempC > 115 ? 'hot' : 'optimal');
+const REDLINE_SHARE = 0.82;
+const GRIP_LIMIT_PERCENT = 65;
 
-export function DrivingHUD({ telemetry, paused, onPause, onRespawn, zoneUnavailable }: DrivingHUDProps) {
-  const rpmProgress = Math.min(1, telemetry.engineRpm / 6700);
+export function DrivingHUD({ telemetry, paused, onPause, zoneUnavailable }: DrivingHUDProps) {
+  const [showDetails, setShowDetails] = useState(false);
+  const rpmShare = Math.min(1, telemetry.engineRpm / 6700);
   const gripPercent = Math.min(100, Math.round(telemetry.slip * 100));
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code === 'KeyT' && !event.repeat) setShowDetails((value) => !value);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
-    <div className="hud-layer" aria-label="Télémétrie de conduite">
-      <header className="hud-topbar">
-        <div className="hud-brand"><span className="brand-mark">C</span><span>CARDRIVE <small>LAB / 01</small></span></div>
-        <div className="track-status"><i /> CIRCUIT DÉMO <span>•</span> SEC / 02:14</div>
-        <button className="icon-button pause-button" onClick={onPause} aria-label={paused ? 'Reprendre' : 'Mettre en pause'}>
-          {paused ? '▶' : 'Ⅱ'}
-        </button>
-      </header>
+    <div className="hud-layer" aria-label="Tableau de bord">
+      <button className="hud-pause" onClick={onPause} aria-label={paused ? 'Reprendre' : 'Mettre en pause'}>
+        {paused ? '▶' : 'Ⅱ'}
+      </button>
 
-      <section className="telemetry-card speed-card">
-        <div className="eyebrow"><span>VITESSE</span><span className="live-dot">● LIVE</span></div>
-        <div className="speed-readout">{kmh(telemetry.speedMps)}<span>km/h</span></div>
-        <div className="speed-track"><span style={{ width: `${Math.min(100, Math.abs(telemetry.speedMps) / 48 * 100)}%` }} /></div>
-        <div className="speed-foot"><span>RWD · PROPULSION</span><span>{telemetry.groundedWheels} / 4 AU SOL</span></div>
-      </section>
+      {showDetails && (
+        <section className="details-panel" aria-label="Détails du véhicule">
+          <h3>Détails</h3>
+          <div className="detail-row"><span>Régime</span><b>{Math.round(telemetry.engineRpm).toLocaleString('fr-FR')} tr/min</b></div>
+          <div className="detail-row"><span>Adhérence</span><b className={gripPercent > GRIP_LIMIT_PERCENT ? 'warning' : ''}>{gripPercent > GRIP_LIMIT_PERCENT ? 'Limite' : 'Stable'}</b></div>
+          <div className="detail-row"><span>Roues au sol</span><b>{telemetry.groundedWheels} / 4</b></div>
+          <div className="tires">
+            {telemetry.tireTemperaturesC.map((tempC, index) => (
+              <div key={TIRE_LABELS[index]} className="detail-row">
+                <span>{TIRE_LABELS[index]}</span>
+                <b className={tireStatus(tempC)}>{Math.round(tempC)} °C</b>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
-      <section className="telemetry-card engine-card">
-        <div className="eyebrow"><span>RÉGIME MOTEUR</span><span>RPM</span></div>
-        <div className="rpm-readout">{Math.round(telemetry.engineRpm).toLocaleString('fr-FR')}<span>tr/min</span></div>
-        <div className="rpm-bars" aria-label={`Régime moteur ${Math.round(telemetry.engineRpm)} tours par minute`}>
-          {Array.from({ length: 24 }, (_, index) => (
-            <i key={index} className={index / 24 < rpmProgress ? (index > 19 ? 'hot' : 'on') : ''} />
-          ))}
+      {gripPercent > GRIP_LIMIT_PERCENT && <p className="limit-pill" role="status">Adhérence limite</p>}
+
+      <section className="cluster" aria-label={`Vitesse ${kmh(telemetry.speedMps)} kilomètres par heure, rapport ${telemetry.gear < 0 ? 'arrière' : telemetry.gear}`}>
+        <div className="cluster-main">
+          <div className={telemetry.gear < 0 ? 'gear reverse' : 'gear'}>{telemetry.gear < 0 ? 'R' : telemetry.gear}</div>
+          <div className="speed"><b>{kmh(telemetry.speedMps)}</b><span>km/h</span></div>
         </div>
-        <div className="engine-foot"><span>BOÎTE AUTO</span><span>MAX 6 400</span></div>
-      </section>
-
-      <aside className="gear-card" aria-label={`Rapport ${telemetry.gear}`}>
-        <span className="eyebrow">RAPPORT</span>
-        <strong>{telemetry.gear < 0 ? 'R' : telemetry.gear}</strong>
-        <span className="gear-caption">{telemetry.gear < 0 ? 'ARRIÈRE' : 'AUTO'}</span>
-      </aside>
-
-      <section className="grip-card">
-        <div className="eyebrow"><span>GLISSEMENT</span><span>{gripPercent}%</span></div>
-        <div className="grip-track"><span className={gripPercent > 65 ? 'warning' : ''} style={{ width: `${gripPercent}%` }} /></div>
-        <div className="grip-caption">{gripPercent > 65 ? 'LIMITE D’ADHÉRENCE' : 'ADHÉRENCE STABLE'}</div>
-      </section>
-
-      <section className="tires-card" aria-label="Température des pneus">
-        <div className="eyebrow"><span>PNEUS</span><span>°C</span></div>
-        <div className="tires-grid">
-          {telemetry.tireTemperaturesC.map((tempC, index) => (
-            <div key={TIRE_LABELS[index]} className={`tire-cell ${tireStatus(tempC)}`}>
-              <span className="tire-label">{TIRE_LABELS[index]}</span>
-              <span className="tire-value">{Math.round(tempC)}</span>
-            </div>
-          ))}
+        <div className="rpm" role="img" aria-label={`Régime moteur ${Math.round(telemetry.engineRpm)} tours par minute`}>
+          <i className={rpmShare > REDLINE_SHARE ? 'high' : ''} style={{ ['--rpm' as string]: `${Math.round(rpmShare * 100)}%` }} />
         </div>
       </section>
 
-      <div className="controls-hint" aria-label="Commandes clavier">
-        <span><kbd>Z</kbd><kbd>W</kbd> ACCÉLÉRER</span>
-        <span><kbd>S</kbd> FREIN / RECUL</span>
-        <span><kbd>Q</kbd><kbd>D</kbd> VIRER</span>
-        <span><kbd>ESPACE</kbd> FREIN À MAIN</span>
+      <div className="hud-hint" aria-label="Commandes">
+        <span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> Conduire</span>
+        <span><kbd>Espace</kbd> Frein à main</span>
+        <span><kbd>R</kbd> Repositionner</span>
+        <span><kbd>T</kbd> Détails</span>
       </div>
 
-      <div className="hud-actions">
-        <button className="text-button" onClick={onRespawn}><kbd>R</kbd> REPOSITIONNER</button>
-        <button className="text-button" onClick={onPause}><kbd>ÉCHAP</kbd> PAUSE</button>
-      </div>
-
-      {zoneUnavailable && <p className="zone-unavailable-notice">ZONE SUIVANTE INDISPONIBLE — NOUVELLE TENTATIVE EN COURS</p>}
+      {zoneUnavailable && <p className="toast" role="status">Zone suivante indisponible, nouvelle tentative en cours…</p>}
     </div>
   );
 }
