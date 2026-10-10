@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { loadRecentPlaces, saveRecentPlace, type RecentPlace } from '../map/recentPlaces';
 import { MIN_QUERY_LENGTH, searchAddress, type GeocodeResult } from '../map/geocodeProvider';
 import type { GeoPoint } from '../shared/types';
 
@@ -15,6 +16,7 @@ export function LocationPicker({ onChoosePlace, onUseDemoTrack, onBack }: Locati
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [recents, setRecents] = useState<RecentPlace[]>(loadRecentPlaces);
   const abortRef = useRef<AbortController | null>(null);
 
   const queryLongEnough = query.trim().length >= MIN_QUERY_LENGTH;
@@ -40,6 +42,7 @@ export function LocationPicker({ onChoosePlace, onUseDemoTrack, onBack }: Locati
     abortRef.current?.abort();
     setResults([]);
     setQuery('');
+    setRecents(saveRecentPlace({ label, point: place }));
     onChoosePlace(place, label);
   };
 
@@ -73,6 +76,21 @@ export function LocationPicker({ onChoosePlace, onUseDemoTrack, onBack }: Locati
             </ul>
           )}
         </div>
+
+        {!queryLongEnough && recents.length > 0 && (
+          <div className="location-recents">
+            <p className="location-search-status">DERNIERS LIEUX</p>
+            <ul className="location-suggestions">
+              {recents.map((recent) => (
+                <li key={`${recent.point.latitudeDeg},${recent.point.longitudeDeg}`}>
+                  <button className="location-option" onClick={() => choose(recent.point, recent.label)}>
+                    {recent.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="location-footer">
           <button className="text-button" onClick={onUseDemoTrack}>PISTE DÉMO HORS LIGNE</button>

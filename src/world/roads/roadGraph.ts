@@ -8,6 +8,8 @@ const DRIVABLE_HIGHWAY_VALUES = new Set([
   'service', 'living_street', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link',
 ]);
 
+const SIDEWALK_HIGHWAY_VALUES = new Set(['trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'living_street']);
+
 const DEFAULT_LANE_WIDTH_M = 3.25;
 const DEFAULT_WIDTH_M = 6;
 
@@ -21,6 +23,8 @@ export interface RoadWay {
   nodeIds: number[];
   widthM: number;
   surface: SurfaceMaterial;
+  /** Vrai si la voie doit être bordée de trottoirs (voirie urbaine ; pas autoroutes, bretelles, voies de service, ni `sidewalk=no`). */
+  hasSidewalks: boolean;
   name?: string;
 }
 
@@ -110,6 +114,7 @@ export function buildRoadGraph(raw: RawOsmData, anchor: GeoAnchor): RoadGraph {
       nodeIds: way.nodeIds,
       widthM: estimateWidthM(way.tags),
       surface: 'asphalt',
+      hasSidewalks: SIDEWALK_HIGHWAY_VALUES.has(way.tags.highway ?? '') && way.tags.sidewalk !== 'no' && way.tags.footway !== 'no',
       name: way.tags.name,
     });
   }

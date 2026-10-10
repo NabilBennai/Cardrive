@@ -9,7 +9,7 @@ import {
   CHUNK_FETCH_MARGIN_M, chunkBoundsGeo, chunkKeyForGeoPoint, chunkKeyToString,
   neighborhood, RENDER_RADIUS_CHUNKS, unionBoundsGeo,
 } from './chunkGrid.ts';
-import { buildStreamedChunk, splitRawByChunk, type StreamedChunk } from './chunkOwnership.ts';
+import { buildStreamedChunk, splitRawByChunk, splitWaterByChunk, type StreamedChunk } from './chunkOwnership.ts';
 import { ChunkStore, FAILURE_BACKOFF_MS } from './chunkStateMachine.ts';
 
 export type { StreamedChunk } from './chunkOwnership.ts';
@@ -65,7 +65,8 @@ export function useChunkStreamer(
       const bounds = chunkBoundsGeo(key, worldAnchor, CHUNK_FETCH_MARGIN_M);
       const cachedRoads = db ? await readGeoCache(db, `${provider.id}-roads-chunk`, bounds).catch(() => null) : null;
       const cachedBuildings = db ? await readGeoCache(db, `${provider.id}-buildings-chunk`, bounds).catch(() => null) : null;
-      if (cachedRoads && cachedBuildings) store.markGenerated(key, buildStreamedChunk(key, worldAnchor, cachedRoads, cachedBuildings));
+      const cachedWater = db ? await readGeoCache(db, `${provider.id}-water-chunk`, bounds).catch(() => null) : null;
+      if (cachedRoads && cachedBuildings && cachedWater) store.markGenerated(key, buildStreamedChunk(key, worldAnchor, cachedRoads, cachedBuildings, cachedWater));
       else stillMissing.push(key);
     }
     if (stillMissing.length === 0) return;
@@ -74,22 +75,26 @@ export function useChunkStreamer(
     const bounds = unionBoundsGeo(stillMissing.map((key) => chunkBoundsGeo(key, worldAnchor, CHUNK_FETCH_MARGIN_M)));
     const controller = new AbortController();
     try {
-      const [roadsRaw, buildingsRaw] = await Promise.all([
+      const [roadsRaw, buildingsRaw, waterRaw] = await Promise.all([
         provider.getRoads(bounds, controller.signal),
         // Best-effort (comme geoOrchestrator.ts) : un bâtiment manquant ne doit jamais empêcher de rouler.
         provider.getBuildings(bounds, controller.signal).catch(() => EMPTY_RAW),
+        provider.getWater(bounds, controller.signal).catch(() => EMPTY_RAW),
       ]);
       const roadBuckets = splitRawByChunk(roadsRaw, worldAnchor, stillMissing);
       const buildingBuckets = splitRawByChunk(buildingsRaw, worldAnchor, stillMissing);
+      const waterBuckets = splitWaterByChunk(waterRaw, worldAnchor, stillMissing);
       for (const key of stillMissing) {
         const keyStr = chunkKeyToString(key);
         const roadRaw = roadBuckets.get(keyStr) ?? EMPTY_RAW;
         const buildingRaw = buildingBuckets.get(keyStr) ?? EMPTY_RAW;
-        store.markGenerated(key, buildStreamedChunk(key, worldAnchor, roadRaw, buildingRaw));
+        const waterChunkRaw = waterBuckets.get(keyStr) ?? EMPTY_RAW;
+        store.markGenerated(key, buildStreamedChunk(key, worldAnchor, roadRaw, buildingRaw, waterChunkRaw));
         if (db) {
           const chunkBounds = chunkBoundsGeo(key, worldAnchor, CHUNK_FETCH_MARGIN_M);
           writeGeoCache(db, `${provider.id}-roads-chunk`, chunkBounds, roadRaw).catch(() => {});
           writeGeoCache(db, `${provider.id}-buildings-chunk`, chunkBounds, buildingRaw).catch(() => {});
+          writeGeoCache(db, `${provider.id}-water-chunk`, chunkBounds, waterChunkRaw).catch(() => {});
         }
       }
     } catch {
@@ -128,7 +133,8 @@ export function useChunkStreamer(
       if ((record.state === 'active' || record.state === 'generated') && record.chunk) nextActive.push(record.chunk);
       if (record.state === 'failed' && nowMs - (record.failedAtMs ?? 0) < FAILURE_BACKOFF_MS * 3) nextUnavailable = true;
     }
-    setActiveChunks(nextActive);
+    // Même contenu qu'avant : on garde la référence pour ne pas invalider les mémos en aval (trottoirs inter-chunks) toutes les 0,4 s.
+    setActiveChunks((previous) => (previous.length === nextActive.length && previous.every((chunk) => nextActive.includes(chunk)) ? previous : nextActive));
     setZoneUnavailable(nextUnavailable);
   });
 

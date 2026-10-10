@@ -3,7 +3,7 @@ import { GeoProviderError, type GeoProviderErrorKind, type RawOsmData } from '..
 import { openGeoCache, readGeoCache, writeGeoCache } from '../map/geoCache.ts';
 import { OverpassProvider } from '../map/overpassProvider.ts';
 import { pickSpawnPose, type RoadSpawnPose } from '../world/roads/spawnPlacement.ts';
-import { buildStreamedChunk, splitRawByChunk, type StreamedChunk } from '../world/streaming/chunkOwnership.ts';
+import { buildStreamedChunk, splitRawByChunk, splitWaterByChunk, type StreamedChunk } from '../world/streaming/chunkOwnership.ts';
 import {
   CHUNK_FETCH_MARGIN_M, chunkBoundsGeo, chunkKeyToString, chunkRenderOffset,
   neighborhood, PHYSICS_RADIUS_CHUNKS, unionBoundsGeo,
@@ -50,7 +50,8 @@ export async function loadRoadWorld(place: GeoPoint, signal: AbortSignal): Promi
     const bounds = chunkBoundsGeo(key, worldAnchor, CHUNK_FETCH_MARGIN_M);
     const cachedRoads = db ? await readGeoCache(db, `${provider.id}-roads-chunk`, bounds).catch(() => null) : null;
     const cachedBuildings = db ? await readGeoCache(db, `${provider.id}-buildings-chunk`, bounds).catch(() => null) : null;
-    if (cachedRoads && cachedBuildings) initialChunks.push(buildStreamedChunk(key, worldAnchor, cachedRoads, cachedBuildings));
+    const cachedWater = db ? await readGeoCache(db, `${provider.id}-water-chunk`, bounds).catch(() => null) : null;
+    if (cachedRoads && cachedBuildings && cachedWater) initialChunks.push(buildStreamedChunk(key, worldAnchor, cachedRoads, cachedBuildings, cachedWater));
     else stillMissing.push(key);
   }
 
@@ -65,18 +66,22 @@ export async function loadRoadWorld(place: GeoPoint, signal: AbortSignal): Promi
     }
     // Best-effort (un bâtiment manquant ne doit jamais empêcher de charger le lieu).
     const buildingsRaw = await provider.getBuildings(bounds, signal).catch(() => EMPTY_RAW);
+    const waterRaw = await provider.getWater(bounds, signal).catch(() => EMPTY_RAW);
 
     const roadBuckets = splitRawByChunk(roadsRaw, worldAnchor, stillMissing);
     const buildingBuckets = splitRawByChunk(buildingsRaw, worldAnchor, stillMissing);
+    const waterBuckets = splitWaterByChunk(waterRaw, worldAnchor, stillMissing);
     for (const key of stillMissing) {
       const keyStr = chunkKeyToString(key);
       const roadRaw = roadBuckets.get(keyStr) ?? EMPTY_RAW;
       const buildingRaw = buildingBuckets.get(keyStr) ?? EMPTY_RAW;
-      initialChunks.push(buildStreamedChunk(key, worldAnchor, roadRaw, buildingRaw));
+      const waterChunkRaw = waterBuckets.get(keyStr) ?? EMPTY_RAW;
+      initialChunks.push(buildStreamedChunk(key, worldAnchor, roadRaw, buildingRaw, waterChunkRaw));
       if (db) {
         const chunkBounds = chunkBoundsGeo(key, worldAnchor, CHUNK_FETCH_MARGIN_M);
         writeGeoCache(db, `${provider.id}-roads-chunk`, chunkBounds, roadRaw).catch(() => {});
         writeGeoCache(db, `${provider.id}-buildings-chunk`, chunkBounds, buildingRaw).catch(() => {});
+        writeGeoCache(db, `${provider.id}-water-chunk`, chunkBounds, waterChunkRaw).catch(() => {});
       }
     }
   }

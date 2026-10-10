@@ -165,3 +165,4 @@ kbd { display: inline-grid; min-width: 18px; height: 18px; margin-right: 3px; pa
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+.location-recents { margin: 0 0 14px; }

@@ -1,3 +1,4 @@
+import { parseWaterResponse } from './waterParse.ts';
 import { GeoProviderError, type GeoBounds, type GeoProvider, type RawOsmData, type RawOsmNode, type RawOsmWay } from './geoProvider.ts';
 
 // Plusieurs miroirs publics, essayés dans l'ordre : l'instance officielle sature/rate-limit
@@ -38,6 +39,12 @@ export function buildBuildingQuery(bounds: GeoBounds): string {
   return `[out:json][timeout:${OVERPASS_TIMEOUT_S}];(way["building"](${bbox}););out body;>;out skel qt;`;
 }
 
+/** Eau : surfaces (natural=water, rives) + cours d'eau linéaires, avec géométrie inline (`out geom`) car les relations multipolygones (grands fleuves, bassins) n'ont pas de nœuds propres exploitables via `out skel`. */
+export function buildWaterQuery(bounds: GeoBounds): string {
+  const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
+  return `[out:json][timeout:${OVERPASS_TIMEOUT_S}];(way["natural"="water"](${bbox});relation["natural"="water"](${bbox});way["waterway"="riverbank"](${bbox});way["waterway"~"^(river|canal|stream)$"](${bbox}););out geom;`;
+}
+
 interface OverpassElement {
   type: 'node' | 'way' | 'relation';
   id: number;
@@ -67,7 +74,7 @@ function parseOverpassResponse(body: unknown): RawOsmData {
   return { nodes, ways };
 }
 
-async function fetchFrom(baseUrl: string, query: string, signal: AbortSignal): Promise<RawOsmData> {
+async function fetchFrom(baseUrl: string, query: string, signal: AbortSignal, parse: (body: unknown) => RawOsmData = parseOverpassResponse): Promise<RawOsmData> {
   const timeoutController = new AbortController();
   const forwardAbort = () => timeoutController.abort();
   signal.addEventListener('abort', forwardAbort);
@@ -102,7 +109,7 @@ async function fetchFrom(baseUrl: string, query: string, signal: AbortSignal): P
   } catch (error) {
     throw new GeoProviderError('malformed-response', 'La réponse Overpass n\'est pas un JSON valide.', { cause: error });
   }
-  return parseOverpassResponse(body);
+  return parse(body);
 }
 
 /** Seule implémentation concrète de GeoProvider pour cette étape : l'API Overpass publique, avec repli sur plusieurs miroirs. */
@@ -118,13 +125,13 @@ export class OverpassProvider implements GeoProvider {
    * répondent mais sont tous vides, on accepte la dernière réponse vide (zone réellement vide,
    * pas un échec réseau).
    */
-  private async fetchWithFallback(query: string, signal: AbortSignal, isAcceptable: (result: RawOsmData) => boolean): Promise<RawOsmData> {
+  private async fetchWithFallback(query: string, signal: AbortSignal, isAcceptable: (result: RawOsmData) => boolean, parse?: (body: unknown) => RawOsmData): Promise<RawOsmData> {
     let lastError: unknown;
     let lastEmptyResult: RawOsmData | null = null;
     for (const baseUrl of this.baseUrls) {
       if (signal.aborted) throw lastError ?? new GeoProviderError('network', 'Requête annulée.');
       try {
-        const result = await fetchFrom(baseUrl, query, signal);
+        const result = await fetchFrom(baseUrl, query, signal, parse);
         if (isAcceptable(result)) return result;
         lastEmptyResult = result;
       } catch (error) {
@@ -143,5 +150,10 @@ export class OverpassProvider implements GeoProvider {
   /** Best-effort : zéro bâtiment est un résultat valide (pas de nouvelle tentative sur une réponse vide). */
   async getBuildings(bounds: GeoBounds, signal: AbortSignal): Promise<RawOsmData> {
     return this.fetchWithFallback(buildBuildingQuery(bounds), signal, () => true);
+  }
+
+  /** Best-effort : l'eau n'est jamais un prérequis pour rouler. Contrairement aux bâtiments, une réponse vide est recoupée auprès des autres miroirs : l'eau est rare, et certains miroirs (osm.ch) à couverture partielle répondent vide sans erreur, ce qui masquerait un fleuve bien réel. */
+  async getWater(bounds: GeoBounds, signal: AbortSignal): Promise<RawOsmData> {
+    return this.fetchWithFallback(buildWaterQuery(bounds), signal, (result) => result.ways.length > 0, parseWaterResponse);
   }
 }

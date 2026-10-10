@@ -1,13 +1,15 @@
-import { CuboidCollider, RigidBody } from '@react-three/rapier';
+import { CuboidCollider, RigidBody, TrimeshCollider } from '@react-three/rapier';
 import { useEffect, useMemo } from 'react';
-import { MeshStandardMaterial, Vector3 } from 'three';
+import { DoubleSide, MeshStandardMaterial, Vector3 } from 'three';
 import { RECENTER_THRESHOLD_M } from '../../geo/floatingOrigin.ts';
 import type { GeoAnchor } from '../../geo/projection.ts';
 import type { VehicleTelemetry } from '../../shared/types.ts';
 import { buildBuildingLayout } from '../buildings/buildingMesh.ts';
 import { buildJunctionFillerGeometry, buildRoadNetworkLayout, buildWayRibbon } from '../roads/roadMesh.ts';
+import { buildSidewalkLayout, extractCarriageways, type ForeignCarriageway } from '../roads/sidewalkMesh.ts';
+import { buildWaterLayout } from '../water/waterMesh.ts';
 import { createAsphaltTexture, createFacadeTexture, createGroundTexture } from '../textures/proceduralTextures.ts';
-import { CHUNK_SIZE_M, chunkRenderOffset } from './chunkGrid.ts';
+import { CHUNK_SIZE_M, chunkKeyToString, chunkRenderOffset } from './chunkGrid.ts';
 import { useChunkStreamer, type StreamedChunk } from './useChunkStreamer.ts';
 
 const ROAD_Y = 0.01;
@@ -32,6 +34,7 @@ interface ChunkGroupProps {
   offset: [number, number, number];
   materials: MeshStandardMaterial[];
   asphaltTexture: ReturnType<typeof createAsphaltTexture>;
+  foreignCarriageways: ForeignCarriageway[];
 }
 
 /**
@@ -41,15 +44,45 @@ interface ChunkGroupProps {
  * §7 : « libérer les géométries... à l'éviction »), donc nettoyage explicite au démontage —
  * contrairement à l'ancienne RoadNetwork.tsx (zone unique, jamais démontée).
  */
-function ChunkGroup({ chunk, offset, materials, asphaltTexture }: ChunkGroupProps) {
+/** Distance au-delà de la tuile d'un chunk dans laquelle on prend en compte les chaussées voisines. */
+const NEIGHBOR_REACH_M = CHUNK_SIZE_M / 2 + 12;
+const NO_FOREIGN: ForeignCarriageway[] = [];
+// Tableaux conservés d'un rendu à l'autre tant que le voisinage chargé d'un chunk ne change pas :
+// sinon chaque chargement/éviction d'un chunk reconstruirait les trottoirs (et colliders) des 25.
+const foreignCache = new Map<string, { signature: string; segments: ForeignCarriageway[] }>();
+
+function foreignCarriagewaysFor(chunk: StreamedChunk, chunks: StreamedChunk[], worldAnchor: GeoAnchor): ForeignCarriageway[] {
+  const neighbors = chunks.filter((other) => other !== chunk && Math.abs(other.key.x - chunk.key.x) <= 1 && Math.abs(other.key.z - chunk.key.z) <= 1);
+  if (neighbors.length === 0) return NO_FOREIGN;
+  const signature = neighbors.map((other) => chunkKeyToString(other.key)).sort().join('|');
+  const cacheKey = chunkKeyToString(chunk.key);
+  const cached = foreignCache.get(cacheKey);
+  if (cached?.signature === signature) return cached.segments;
+  const origin = chunkRenderOffset(chunk.key, worldAnchor, worldAnchor);
+  const segments = neighbors.flatMap((other) => {
+    const o = chunkRenderOffset(other.key, worldAnchor, worldAnchor);
+    return extractCarriageways(other.graph, o.xM - origin.xM, o.zM - origin.zM, NEIGHBOR_REACH_M);
+  });
+  foreignCache.set(cacheKey, { signature, segments });
+  return segments;
+}
+
+const sidewalkMaterial = new MeshStandardMaterial({ color: '#9a9b96', roughness: 0.95, side: DoubleSide });
+const waterMaterial = new MeshStandardMaterial({ color: '#2f6f9f', roughness: 0.25, metalness: 0.1, side: DoubleSide });
+
+function ChunkGroup({ chunk, offset, materials, asphaltTexture, foreignCarriageways }: ChunkGroupProps) {
   const layout = useMemo(() => buildRoadNetworkLayoutSubset(chunk), [chunk]);
   const buildingLayout = useMemo(() => buildBuildingLayout(chunk.buildingGraph, BUILDING_BASE_Y, materials.length), [chunk, materials.length]);
+  const sidewalkLayout = useMemo(() => buildSidewalkLayout(chunk.graph, foreignCarriageways), [chunk, foreignCarriageways]);
+  const waterLayout = useMemo(() => buildWaterLayout(chunk.waterGraph), [chunk]);
 
   useEffect(() => () => {
     for (const geometry of layout.wayGeometries) geometry.dispose();
     for (const geometry of layout.junctionGeometries) geometry.dispose();
     for (const placement of buildingLayout) placement.geometry.dispose();
-  }, [layout, buildingLayout]);
+    sidewalkLayout.visual?.dispose();
+    for (const geometry of waterLayout.surfaces) geometry.dispose();
+  }, [layout, buildingLayout, sidewalkLayout, waterLayout]);
 
   return (
     <group position={offset}>
@@ -63,6 +96,22 @@ function ChunkGroup({ chunk, offset, materials, asphaltTexture }: ChunkGroupProp
           <meshStandardMaterial map={asphaltTexture} roughness={0.9} />
         </mesh>
       ))}
+      {sidewalkLayout.visual && (
+        <mesh geometry={sidewalkLayout.visual} material={sidewalkMaterial} receiveShadow castShadow />
+      )}
+      {sidewalkLayout.collider && sidewalkLayout.visual && (
+        <RigidBody key={sidewalkLayout.visual.uuid} type="fixed" colliders={false}>
+          <TrimeshCollider args={[sidewalkLayout.collider.vertices, sidewalkLayout.collider.indices]} />
+        </RigidBody>
+      )}
+      {waterLayout.surfaces.map((geometry, index) => (
+        <mesh key={`water-${index}`} geometry={geometry} material={waterMaterial} />
+      ))}
+      {waterLayout.collider && (
+        <RigidBody type="fixed" colliders={false}>
+          <TrimeshCollider args={[waterLayout.collider.vertices, waterLayout.collider.indices]} />
+        </RigidBody>
+      )}
       {buildingLayout.map((placement) => (
         <RigidBody key={placement.id} type="fixed" colliders={false}>
           <mesh geometry={placement.geometry} material={materials[placement.materialIndex]} castShadow receiveShadow />
@@ -124,7 +173,7 @@ export function StreamingRoadNetwork({ worldAnchor, renderAnchor, telemetryRef, 
       {streamer.activeChunks.map((chunk) => {
         const local = chunkRenderOffset(chunk.key, worldAnchor, renderAnchor);
         const offset: [number, number, number] = [local.xM, 0, local.zM];
-        return <ChunkGroup key={`${chunk.key.x},${chunk.key.z}`} chunk={chunk} offset={offset} materials={materials} asphaltTexture={asphaltTexture} />;
+        return <ChunkGroup key={`${chunk.key.x},${chunk.key.z}`} chunk={chunk} offset={offset} materials={materials} asphaltTexture={asphaltTexture} foreignCarriageways={foreignCarriagewaysFor(chunk, streamer.activeChunks, worldAnchor)} />;
       })}
     </group>
   );

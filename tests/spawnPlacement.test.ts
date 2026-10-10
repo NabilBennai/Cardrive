@@ -12,8 +12,8 @@ describe('pickSpawnPose', () => {
         [40, { id: 40, local: { xM: 60, yM: 0, zM: 0 } }],
       ]),
       ways: [
-        { id: 100, nodeIds: [10, 20], widthM: 6, surface: 'asphalt' },
-        { id: 200, nodeIds: [30, 40], widthM: 6, surface: 'asphalt' },
+        { id: 100, nodeIds: [10, 20], widthM: 6, surface: 'asphalt', hasSidewalks: false },
+        { id: 200, nodeIds: [30, 40], widthM: 6, surface: 'asphalt', hasSidewalks: false },
       ],
       junctionNodeIds: new Set(),
       excluded: [],

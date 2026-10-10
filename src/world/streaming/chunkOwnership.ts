@@ -3,12 +3,14 @@ import type { RawOsmData, RawOsmNode } from '../../map/geoProvider.ts';
 import type { ChunkKey, GeoPoint } from '../../shared/types.ts';
 import { buildBuildingGraph, type BuildingGraph } from '../buildings/buildingGraph.ts';
 import { buildRoadGraph, emptyRoadGraph, EmptyRoadZoneError, type RoadGraph } from '../roads/roadGraph.ts';
-import { chunkCenterGeoPoint, chunkKeyForGeoPoint, chunkKeyToString } from './chunkGrid.ts';
+import { buildWaterGraph, EMPTY_WATER_GRAPH, type WaterGraph } from '../water/waterGraph.ts';
+import { CHUNK_SIZE_M, chunkBoundsGeo, chunkCenterGeoPoint, chunkKeyForGeoPoint, chunkKeyToString } from './chunkGrid.ts';
 
 export interface StreamedChunk {
   key: ChunkKey;
   graph: RoadGraph;
   buildingGraph: BuildingGraph;
+  waterGraph: WaterGraph;
 }
 
 /**
@@ -17,7 +19,7 @@ export interface StreamedChunk {
  * reconstruite au recentrage), et traite un EmptyRoadZoneError comme un RoadGraph vide (un
  * chunk sans route est normal, contrairement à une zone entière vide à l'étape 3).
  */
-export function buildStreamedChunk(key: ChunkKey, worldAnchor: GeoAnchor, roadRaw: RawOsmData, buildingRaw: RawOsmData): StreamedChunk {
+export function buildStreamedChunk(key: ChunkKey, worldAnchor: GeoAnchor, roadRaw: RawOsmData, buildingRaw: RawOsmData, waterRaw?: RawOsmData): StreamedChunk {
   const anchor = chunkCenterGeoPoint(key, worldAnchor);
   let graph: RoadGraph;
   try {
@@ -27,7 +29,8 @@ export function buildStreamedChunk(key: ChunkKey, worldAnchor: GeoAnchor, roadRa
     else throw error;
   }
   const buildingGraph = buildBuildingGraph(buildingRaw, anchor);
-  return { key, graph, buildingGraph };
+  const waterGraph = waterRaw ? buildWaterGraph(waterRaw, anchor, CHUNK_SIZE_M / 2) : EMPTY_WATER_GRAPH;
+  return { key, graph, buildingGraph, waterGraph };
 }
 
 /**
@@ -62,5 +65,39 @@ export function splitRawByChunk(raw: RawOsmData, worldAnchor: GeoAnchor, neededK
     }
   }
 
+  return buckets;
+}
+
+/**
+ * Contrairement aux routes/bâtiments (propriété par premier nœud), une surface d'eau est copiée
+ * dans CHAQUE chunk demandé que sa boîte englobante touche : un fleuve ou un lac dépasse très
+ * largement une tuile de 256 m, et s'il n'appartenait qu'au chunk de son premier nœud il
+ * disparaîtrait dès que celui-ci est évincé alors qu'on longe encore la rive. Chaque chunk
+ * découpe ensuite sa part (buildWaterGraph).
+ */
+export function splitWaterByChunk(raw: RawOsmData, worldAnchor: GeoAnchor, neededKeys: ChunkKey[]): Map<string, RawOsmData> {
+  const nodesById = new Map<number, RawOsmNode>();
+  for (const node of raw.nodes) nodesById.set(node.id, node);
+
+  const buckets = new Map<string, RawOsmData>();
+  const bounds = neededKeys.map((key) => ({ keyStr: chunkKeyToString(key), box: chunkBoundsGeo(key, worldAnchor, 0) }));
+  for (const { keyStr } of bounds) buckets.set(keyStr, { nodes: [], ways: [] });
+
+  for (const way of raw.ways) {
+    const wayNodes = way.nodeIds.map((id) => nodesById.get(id)).filter((node): node is RawOsmNode => node !== undefined);
+    if (wayNodes.length === 0) continue;
+    let south = Infinity; let north = -Infinity; let west = Infinity; let east = -Infinity;
+    for (const node of wayNodes) {
+      south = Math.min(south, node.latitudeDeg); north = Math.max(north, node.latitudeDeg);
+      west = Math.min(west, node.longitudeDeg); east = Math.max(east, node.longitudeDeg);
+    }
+    for (const { keyStr, box } of bounds) {
+      if (north < box.south || south > box.north || east < box.west || west > box.east) continue;
+      const bucket = buckets.get(keyStr);
+      if (!bucket) continue;
+      bucket.ways.push(way);
+      bucket.nodes.push(...wayNodes);
+    }
+  }
   return buckets;
 }

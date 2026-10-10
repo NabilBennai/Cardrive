@@ -15,8 +15,9 @@ const STORE_NAME = 'zones';
  *  publics (observé : réponses vides/erreurs sur des zones qui ont pourtant des routes).
  *  v4 : étape 4 (streaming) — les entrées sont désormais indexées par bbox de CHUNK (256 m,
  *  suffixe -chunk) au lieu de bbox de zone entière (~800 m) ; les anciennes entrées v3
- *  deviennent orphelines plutôt que d'être mal réutilisées pour un découpage différent. */
-export const GENERATOR_VERSION = 4;
+ *  deviennent orphelines plutôt que d'être mal réutilisées pour un découpage différent.
+ *  v5 : ajout de l'eau (entrées -water-chunk) ; les chunks mis en cache avant n'ont pas d'eau. */
+export const GENERATOR_VERSION = 5;
 export const MAX_AGE_MS = 24 * 60 * 60 * 1_000;
 export const MAX_ENTRIES = 40;
 
