@@ -12,6 +12,7 @@ import type { Ghost } from '../race/ghost';
 import type { GridSlot } from '../race/grid';
 import { createCircuitSurface } from '../race/circuitSurface';
 import { OpponentCar, type OpponentSpec } from '../race/OpponentCar';
+import { RolloverGuard } from '../race/RolloverGuard';
 import { PlayerAutopilot } from '../race/PlayerAutopilot';
 import { RaceDirector, type RaceState } from '../race/RaceDirector';
 import { TireEffects } from '../feel/TireEffects';
@@ -64,6 +65,9 @@ interface DrivingSceneProps {
   tractionControl?: TractionControl;
   /** Boîte de vitesses du joueur (automatique par défaut). */
   transmission?: Transmission;
+  /** Voiture du joueur retournée (état) et remise en piste d'office en course. */
+  onFlippedChange?: (flipped: boolean) => void;
+  onAutoRecover?: () => void;
   /** Crochet de test (`?autopilot`) : le pilote automatique conduit la voiture du joueur sur un circuit. */
   autopilot?: boolean;
   /** Course contre des adversaires pilotés par l'IA (circuits uniquement). */
@@ -77,7 +81,7 @@ interface DrivingSceneProps {
 }
 
 export function DrivingScene({
-  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot, tractionControl, transmission,
+  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot, tractionControl, transmission, onFlippedChange, onAutoRecover,
 }: DrivingSceneProps) {
   // Poses de roues du solveur, partagées avec les effets de pneus (fumée, traces).
   const wheelPosesRef = useRef<WheelPose[] | null>(null);
@@ -183,6 +187,7 @@ export function DrivingScene({
               />
             </>
           )}
+          {onFlippedChange && <RolloverGuard bodyRef={bodyRef} onFlippedChange={onFlippedChange} onAutoRecover={field ? onAutoRecover : undefined} />}
           <PerfProbe />
         </Suspense>
       </Physics>

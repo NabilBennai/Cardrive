@@ -114,6 +114,7 @@ export function App() {
       return next;
     });
   }, []);
+  const [flipped, setFlipped] = useState(false);
   const [showCarPicker, setShowCarPicker] = useState(false);
   const [showCircuitPicker, setShowCircuitPicker] = useState(false);
   const [circuitTrack, setCircuitTrack] = useState<CircuitTrack | null>(null);
@@ -311,6 +312,8 @@ export function App() {
               autopilot={autopilotRequested}
               tractionControl={assists.tractionControl}
               transmission={isTouchDevice ? 'auto' : assists.transmission}
+              onFlippedChange={setFlipped}
+              onAutoRecover={respawn}
             />
           </Suspense>
         </SceneErrorBoundary>
@@ -373,6 +376,7 @@ export function App() {
         <TouchControls setStick={touchInput.setStick} setHandbrake={touchInput.setHandbrake} />
       )}
 
+      {playing && flipped && <p className="limit-pill flip-pill" role="status">Voiture retournée · appuyez sur R pour la remettre sur ses roues{raceField ? ' (remise en piste automatique)' : ''}</p>}
       {playing && circuitTrack && <LapHud state={raceSession.hud} notice={raceSession.notice} />}
       {playing && circuitTrack && raceField && <RaceHud state={raceState} />}
       {playing && raceField && raceState?.playerFinished && <RaceResults state={raceState} onReplay={replayRace} onQuit={quitToMenu} />}

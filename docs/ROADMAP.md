@@ -243,8 +243,11 @@ Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout :
 - Vérifié : 7 tests unitaires (pas de passage automatique, un appui = un rapport, rétrogradation refusée à 45 m/s et acceptée à 12 m/s, calage et redémarrage, conseil, absence de conseil en automatique) ; e2e dans le navigateur (rapport tenu en 1re, E → 2e, C → 1re).
 - **Limites** : pas d'embrayage modélisé (pas de pédale : l'embrayage est géré automatiquement, il ne patine pas au démarrage) ; pas de neutre ; marche arrière toujours obtenue en freinant à l'arrêt ; pas de dégâts moteur en cas de sur-régime (la rétrogradation est simplement refusée).
 
-### R-3.9 Franchissement et stabilité — M ⬜
-- Test de retournement et de remise sur roues (aujourd’hui `R` repositionne), protection contre les erreurs numériques à très haute vitesse (CCD actif, valider à 350 km/h sur la voiture de course futuriste), limites de vitesse angulaire.
+### R-3.9 Franchissement et stabilité ✅
+- **Haute vitesse** : accélération pleine puissance pendant 40 s puis changements de cap à ±15 % de braquage, sur les deux monoplaces : aucune valeur aberrante (positions, vitesses et vitesses angulaires finies), 4 roues au sol, caisse à plat, hauteur max 0,7 m, vitesse angulaire max 1,9 rad/s. Pointes atteintes : **293 km/h** (thermique) et **310 km/h** (électrique), en deçà des 340 et 380 km/h visés par leurs profils : la démultiplication et la traînée plafonnent la vitesse avant la cible (écart non investigué, sans lien avec la stabilité). **350 km/h n'est donc pas atteint et n'a pas pu être validé.**
+- **Retournement** : un slalom à fond de braquage à 110 km/h sur les 17 véhicules du catalogue ne fait jamais basculer la caisse (inclinaison négligeable) : il n'y a pas de rampe dans le jeu, seuls des chocs violents pourraient retourner une voiture. Détecteur ajouté (axe haut sous 0,35, vitesse < 4 m/s, pendant 2 s) : message « Voiture retournée · appuyez sur R » et, en course, **remise en piste automatique** après 4 s.
+- Vérifié : tests unitaires du détecteur et d'une voiture posée sur le toit dans le solveur. **Non vérifié dans le navigateur** : aucun moyen d'y retourner la voiture dans les scénarios e2e.
+- Non fait : limites de vitesse angulaire explicites (inutiles d'après les mesures), CCD déjà actif.
 
 ---
 
