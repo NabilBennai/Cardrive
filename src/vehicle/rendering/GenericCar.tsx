@@ -34,6 +34,10 @@ interface GenericCarProps {
   config?: VehicleConfig;
   /** Reçoit les poses de roues du solveur (fumée, traces de pneus) : même tableau que celui qui anime les roues. */
   wheelPosesOutRef?: React.RefObject<WheelPose[] | null>;
+  /** Faux pour une voiture adverse : elle ne règle pas l'horloge d'extrapolation visuelle (voir useVehiclePhysics). */
+  drivesClock?: boolean;
+  /** Pose de remise en piste (course) : si présente et non nulle, `R` replace la voiture là plutôt qu'au point de départ. */
+  respawnPoseRef?: React.RefObject<VehicleSpawnPose | null>;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
@@ -357,9 +361,9 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef }: GenericCarProps) {
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef, drivesClock, respawnPoseRef }: GenericCarProps) {
   const wheelPosesRef = useRef(initialWheelPoses(config));
-  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep });
+  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep, drivesClock });
   const previousRespawnVersion = useRef(respawnVersion);
   // Après useVehiclePhysics (qui installe le tableau de poses du solveur) : on publie ce même tableau.
   useLayoutEffect(() => { if (wheelPosesOutRef) wheelPosesOutRef.current = wheelPosesRef.current; }, [wheelPosesOutRef]);
@@ -404,7 +408,9 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
   const respawn = useCallback(() => {
     const rigidBody = bodyRef.current;
     if (!rigidBody) return;
-    resetVehicleBody(rigidBody, spawnPosition, spawnPose?.rotation);
+    const racePose = respawnPoseRef?.current ?? null;
+    const position = racePose?.position ?? spawnPosition;
+    resetVehicleBody(rigidBody, position, racePose?.rotation ?? spawnPose?.rotation);
     wheelPosesRef.current.forEach((wheel) => {
       wheel.suspensionM = restSuspensionM(config);
       wheel.spinRad = 0;
@@ -416,10 +422,10 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
     telemetryRef.current = {
       speedMps: 0, engineRpm: config.idleRpm, gear: 1, slip: 0, groundedWheels: 0, throttle: 0, brake: 0, steering: 0,
       tireTemperaturesC: wheelPosesRef.current.map((wheel) => wheel.temperatureC),
-      positionM: { xM: spawnPosition.x, zM: spawnPosition.z },
+      positionM: { xM: position.x, zM: position.z },
       headingRad: 0,
     };
-  }, [bodyRef, telemetryRef, spawnPosition, spawnPose?.rotation, config]);
+  }, [bodyRef, telemetryRef, spawnPosition, spawnPose?.rotation, config, respawnPoseRef]);
 
   useLayoutEffect(() => {
     if (previousRespawnVersion.current !== respawnVersion) {

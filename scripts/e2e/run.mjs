@@ -2,6 +2,7 @@
 // échoue sur toute erreur de console, tout écran vide, toute régression visuelle des écrans d'interface, tout dépassement
 // grossier du budget physique. Usage : npm run e2e  |  npm run e2e:update (rafraîchit les images de référence)
 //   Options : --update  --gpu (rendu matériel : seul mode où les FPS sont représentatifs)  --network (scénario ville réelle)
+//             --full-lap (un tour complet de Monaco piloté par le pilote automatique : chrono, record, fantôme)
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -19,6 +20,8 @@ const ONLY = process.argv.find((arg) => arg.startsWith('--only='))?.slice('--onl
 const UPDATE = args.has('--update');
 const GPU = args.has('--gpu');
 const NETWORK = args.has('--network');
+/** --full-lap : ajoute un tour complet piloté par le pilote automatique (≈ 4 min) : chrono, record, fantôme. */
+const FULL_LAP = args.has('--full-lap');
 /** Le catalogue = le prototype procédural + un modèle GLB par véhicule du kit. */
 const VEHICLE_COUNT = readdirSync(join(root, 'public', 'models', 'cars')).filter((name) => name.endsWith('.glb')).length + 1;
 const CIRCUIT_COUNT = 24;
@@ -154,7 +157,9 @@ async function driveAndCheck(page, label, options = {}) {
   await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement de la scène', 90_000);
   await setPerfOverlay(page, true);
   await sleep(1_200);
-  const idleAudio = await readAudio(page);
+  // En rendu logiciel, la scène met du temps à produire ses premières images : le contexte audio ne démarre qu'alors.
+  let idleAudio = await readAudio(page);
+  for (let attempt = 0; attempt < 40 && idleAudio.state !== 'running'; attempt += 1) { await sleep(500); idleAudio = await readAudio(page); }
   const startedAt = Date.now();
   await page.key('keyDown', 'KeyW', 'w');
   let speed = 0;
@@ -360,6 +365,126 @@ try {
     if (!(muted.level < -70)) throw new Error(`La sourdine (M) ne coupe pas le son (niveau ${muted.level.toFixed(0)} dBFS).`);
     return `grincement max ${loudestSqueal.toFixed(2)} · sourdine ${muted.level.toFixed(0)} dBFS`;
   });
+
+  await scenario('Chronométrage : ligne de départ, tour lancé, repositionnement, record affiché', async () => {
+    await home(page);
+    // Un record enregistré (Singapour, prototype) doit apparaître sur la carte du circuit.
+    await page.eval(`localStorage.setItem('cardrive.records', JSON.stringify({ version: 1, records: { 'sg-2008|prototype': { bestS: 95.123, sectorS: [30, 35, 30.123], profileS: [0, 47, 95.123], setAtMs: 1 } } }))`);
+    await home(page);
+    await page.click('Circuits F1 2026');
+    await page.waitFor("document.querySelector('.circuit-card')", 'le catalogue de circuits');
+    const badge = await page.eval("[...document.querySelectorAll('.circuit-record')].map((node) => node.textContent).join('|')");
+    if (!badge.includes('1:35.123')) throw new Error(`Le record enregistré n'apparaît pas sur la carte (« ${badge} »).`);
+    if (!(await page.click('Singapour'))) throw new Error('Circuit de Singapour introuvable.');
+    await page.waitFor("document.querySelector('.lap-hud')", 'le chrono');
+    await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement de la scène', 90_000);
+    const waiting = await page.eval("document.querySelector('.lap-label')?.textContent ?? ''");
+    if (!/Franchissez la ligne/.test(waiting)) throw new Error(`Le chrono devrait attendre la ligne (« ${waiting} »).`);
+    const best = await page.eval("document.querySelector('[data-lap=\"best\"]')?.textContent ?? ''");
+    if (best !== '1:35.123') throw new Error(`Meilleur tour affiché « ${best} » au lieu de 1:35.123.`);
+    // La voiture démarre à quelques mètres avant la ligne : en accélérant, le chrono se lance.
+    await page.key('keyDown', 'KeyW', 'w');
+    await page.waitFor("/Tour 1/.test(document.querySelector('.lap-label')?.textContent ?? '')", 'le départ du tour 1', 30_000);
+    const first = await page.eval("document.querySelector('[data-lap=\"current\"]')?.textContent ?? ''");
+    await sleep(1_500);
+    const second = await page.eval("document.querySelector('[data-lap=\"current\"]')?.textContent ?? ''");
+    writeFileSync(join(outputDir, 'chrono.png'), await page.screenshot());
+    await page.key('keyUp', 'KeyW', 'w');
+    if (first === second) throw new Error(`Le chrono n'avance pas (${first} → ${second}).`);
+    // Repositionner (R) perd le tour : le chrono attend de nouveau la ligne.
+    await page.tap('KeyR', 'r');
+    await page.waitFor("/Franchissez la ligne/.test(document.querySelector('.lap-label')?.textContent ?? '')", 'le retour en attente après repositionnement', 15_000);
+    assertNoProblems(page, 'chrono');
+    return `chrono ${first} → ${second} en 1,5 s, remis en attente par R`;
+  });
+
+  await scenario('Course : feux de départ, adversaires pilotés, classement, retour au menu', async () => {
+    try {
+    await home(page);
+    await page.click('Circuits F1 2026');
+    await page.waitFor("document.querySelector('.circuit-card')", 'le catalogue de circuits');
+    if (!(await page.click('Course'))) throw new Error('Bouton « Course » introuvable.');
+    if (!(await page.click('Monaco'))) throw new Error('Circuit de Monaco introuvable.');
+    await page.waitFor("document.querySelector('.race-status')", 'le rang de course', 90_000);
+    await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement de la scène', 90_000);
+    // Les feux s'allument un à un (temps de simulation), puis s'éteignent.
+    await page.waitFor("document.querySelector('.start-lights')", 'les feux de départ');
+    await page.waitFor("document.querySelector('.start-lights')?.dataset.lights === '3'", 'les trois feux allumés', 20_000);
+    const startPosition = await page.eval("document.querySelector('[data-race=\"position\"]')?.textContent ?? ''");
+    if (startPosition !== '6e') throw new Error(`Le joueur devrait partir en dernière position (6e), pas « ${startPosition} ».`);
+    writeFileSync(join(outputDir, 'course-grille.png'), await page.screenshot());
+    await page.waitFor("!document.querySelector('.start-lights')", 'le départ (feux éteints)', 20_000);
+    // Départ : plein gaz ; les adversaires partent aussi, donc un écart se creuse devant nous.
+    await page.key('keyDown', 'KeyW', 'w');
+    await sleep(12_000);
+    const gapText = await page.eval("document.querySelector('[data-race=\"gap\"]')?.textContent ?? ''");
+    writeFileSync(join(outputDir, 'course.png'), await page.screenshot());
+    const lapText = await page.eval("document.querySelector('[data-race=\"lap\"]')?.textContent ?? ''");
+    await page.key('keyUp', 'KeyW', 'w');
+    const falseStart = await page.eval("Boolean(document.querySelector('.false-start'))");
+    if (falseStart) throw new Error('Faux départ signalé alors que le joueur attendait les feux.');
+    if (!/Tour 1 \/ 3/.test(lapText)) throw new Error(`Compteur de tours inattendu : « ${lapText} ».`);
+    if (!/devant : \d+ m/.test(gapText)) throw new Error(`Écart à la voiture précédente absent (« ${gapText} »).`);
+    // Pause → retour au menu.
+    await page.tap('Escape', 'Escape');
+    await page.waitFor("document.querySelector('.pause-panel')", 'le panneau de pause');
+    if (!(await page.click('Quitter vers le menu'))) throw new Error('Bouton « Quitter vers le menu » introuvable.');
+    await page.waitFor("document.querySelector('.menu-row')", 'le menu principal');
+    assertNoProblems(page, 'course');
+    return `départ 6e, ${lapText}, ${gapText}`;
+    } finally {
+      // Le mode de jeu est mémorisé : les scénarios suivants doivent retrouver le contre-la-montre.
+      await page.eval("localStorage.removeItem('cardrive.raceSetup')");
+    }
+  });
+
+  if (FULL_LAP) {
+    await scenario('Tour complet piloté (Monaco) : chrono, secteurs, record sauvegardé, fantôme du tour suivant', async () => {
+      try {
+        await page.goto(`${URL}?autopilot=1`);
+        await page.waitFor("document.querySelector('.menu-row')", 'le menu principal');
+        await page.eval("localStorage.removeItem('cardrive.records'); localStorage.removeItem('cardrive.ghosts'); localStorage.removeItem('cardrive.raceSetup')");
+        await page.click('Circuits F1 2026');
+        await page.waitFor("document.querySelector('.circuit-card')", 'le catalogue de circuits');
+        if (!(await page.click('Monaco'))) throw new Error('Circuit de Monaco introuvable.');
+        await page.waitFor("document.querySelector('.lap-hud')", 'le chrono');
+        await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement de la scène', 90_000);
+        // Tour 1 démarre à la ligne ; il se termine environ 3 minutes plus tard : on attend l'affichage du « dernier tour ».
+        await page.waitFor("/Tour 1/.test(document.querySelector('.lap-label')?.textContent ?? '')", 'le départ du tour 1', 60_000);
+        const sectors = [];
+        const lapDone = String.raw`/^\d+:\d\d\.\d{3}$/.test(document.querySelector('[data-lap="last"]')?.textContent ?? '')`;
+        const startedAt = Date.now();
+        while (!(await page.eval(lapDone))) {
+          if (Date.now() - startedAt > 420_000) throw new Error('Le tour 1 ne se termine pas (7 minutes écoulées).');
+          const notice = await page.eval("document.querySelector('.lap-notice')?.textContent ?? ''");
+          if (/^Secteur/.test(notice) && !sectors.includes(notice.slice(0, 9))) sectors.push(notice.slice(0, 9));
+          await sleep(1_000);
+        }
+        const lastText = await page.eval("document.querySelector('[data-lap=\"last\"]')?.textContent ?? ''");
+        const bestText = await page.eval("document.querySelector('[data-lap=\"best\"]')?.textContent ?? ''");
+        const stored = JSON.parse(await page.eval("localStorage.getItem('cardrive.records') ?? '{}'"));
+        const record = stored.records?.['mc-1929|prototype'];
+        if (!record) throw new Error('Aucun record enregistré après le premier tour.');
+        const ghosts = JSON.parse(await page.eval("localStorage.getItem('cardrive.ghosts') ?? '{}'"));
+        const ghost = ghosts.ghosts?.['mc-1929|prototype'];
+        if (!ghost || ghost.d.length < 300) throw new Error('Aucun fantôme enregistré (ou trace trop courte) après le premier tour.');
+        if (Math.abs(record.bestS - ghost.lapS) > 0.001) throw new Error(`Record (${record.bestS}) et fantôme (${ghost.lapS}) ne correspondent pas.`);
+        if (lastText !== bestText) throw new Error(`Dernier (${lastText}) et meilleur (${bestText}) devraient être égaux après le premier tour.`);
+        if (sectors.length < 2) throw new Error(`Seulement ${sectors.length} message(s) de secteur vu(s) pendant le tour (2 attendus).`);
+        // Tour 2 : l'écart au record et le fantôme apparaissent.
+        await page.waitFor("/Tour 2/.test(document.querySelector('.lap-label')?.textContent ?? '')", 'le départ du tour 2', 20_000);
+        await sleep(15_000);
+        const delta = await page.eval("document.querySelector('[data-lap=\"delta\"]')?.textContent ?? ''");
+        writeFileSync(join(outputDir, 'tour-complet.png'), await page.screenshot());
+        if (!/^[+−]\d+\.\d{3}$/.test(delta)) throw new Error(`Écart au meilleur tour absent ou mal formé en tour 2 (« ${delta} »).`);
+        assertNoProblems(page, 'tour-complet');
+        const sectorMs = record.sectorS.map((value) => value.toFixed(1)).join(' / ');
+        return `tour 1 en ${lastText} (secteurs ${sectorMs} s), ${(ghost.d.length / 3)} points de fantôme, écart en tour 2 : ${delta}`;
+      } finally {
+        await page.eval("localStorage.removeItem('cardrive.records'); localStorage.removeItem('cardrive.ghosts')");
+      }
+    });
+  }
 
   await scenario('Pause et reprise', async () => {
     await home(page);

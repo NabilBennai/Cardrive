@@ -1,17 +1,24 @@
 import { Canvas } from '@react-three/fiber';
 import { Physics, type RapierRigidBody } from '@react-three/rapier';
-import { Suspense, useEffect, useRef } from 'react';
+import { createRef, Suspense, useEffect, useMemo, useRef } from 'react';
 import type { GeoAnchor } from '../geo/projection';
 import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../shared/types';
 import { ChaseCamera } from '../camera/ChaseCamera';
 import { AudioDriver } from '../audio/AudioDriver';
 import { PerfProbe } from '../debug/PerfProbe';
+import { RaceDriver, type RaceSnapshot } from '../race/RaceDriver';
+import type { LapTimerEvent } from '../race/lapTimer';
+import type { Ghost } from '../race/ghost';
+import type { GridSlot } from '../race/grid';
+import { OpponentCar, type OpponentSpec } from '../race/OpponentCar';
+import { PlayerAutopilot } from '../race/PlayerAutopilot';
+import { RaceDirector, type RaceState } from '../race/RaceDirector';
 import { TireEffects } from '../feel/TireEffects';
 import type { WheelPose } from '../vehicle/physics/VehicleSimulation';
 import { FollowingSun } from './FollowingSun';
 import { CircuitScene } from '../circuits/CircuitScene';
 import type { CircuitTrack } from '../circuits/circuitGeometry';
-import { GenericCar } from '../vehicle/rendering/GenericCar';
+import { GenericCar, type VehicleSpawnPose } from '../vehicle/rendering/GenericCar';
 import { DemoTrack } from '../world/terrain/DemoTrack';
 import { StreamingRoadNetwork } from '../world/streaming/StreamingRoadNetwork';
 import { FloatingOriginApplier } from '../world/streaming/FloatingOriginApplier';
@@ -44,17 +51,42 @@ interface DrivingSceneProps {
   carId: string | null;
   /** Tremblement de caméra et champ de vision variable (réglage du joueur). */
   cameraEffects: boolean;
+  /** Chronométrage (circuits uniquement). */
+  race?: {
+    referenceProfileS: readonly number[] | null;
+    ghost: Ghost | null;
+    onLapGhost: (ghost: Ghost) => void;
+    onSnapshot: (snapshot: RaceSnapshot) => void;
+    onEvent: (event: LapTimerEvent) => void;
+  };
+  /** Crochet de test (`?autopilot`) : le pilote automatique conduit la voiture du joueur sur un circuit. */
+  autopilot?: boolean;
+  /** Course contre des adversaires pilotés par l'IA (circuits uniquement). */
+  field?: {
+    laps: number;
+    opponents: OpponentSpec[];
+    playerSlot: GridSlot;
+    opponentModelUrl: string | null;
+    onState: (state: RaceState) => void;
+  };
 }
 
 export function DrivingScene({
-  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects,
+  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot,
 }: DrivingSceneProps) {
   // Poses de roues du solveur, partagées avec les effets de pneus (fumée, traces).
   const wheelPosesRef = useRef<WheelPose[] | null>(null);
+  // Course : corps des adversaires (pour le chef de course), signal de départ et point de reprise du joueur.
+  const goRef = useRef({ go: false });
+  const playerRespawnPoseRef = useRef<VehicleSpawnPose | null>(null);
+  const opponentBodies = useMemo(() => (field ? field.opponents.map((opponent) => ({ id: opponent.id, bodyRef: createRef<RapierRigidBody>() })) : []), [field]);
   const spawnPose = world.kind === 'roads'
     ? { position: { x: world.spawnPose.position.xM, y: vehicleSpawnHeightM(vehicle), z: world.spawnPose.position.zM }, rotation: headingToQuaternion(world.spawnPose.headingRad) }
     : world.kind === 'circuit'
-      ? { position: { x: world.track.spawn.xM, y: vehicleSpawnHeightM(vehicle), z: world.track.spawn.zM }, rotation: headingToQuaternion(world.track.spawn.headingRad) }
+      ? {
+        position: { x: field?.playerSlot.xM ?? world.track.spawn.xM, y: vehicleSpawnHeightM(vehicle), z: field?.playerSlot.zM ?? world.track.spawn.zM },
+        rotation: headingToQuaternion(field?.playerSlot.headingRad ?? world.track.spawn.headingRad),
+      }
       : undefined;
   // Toujours appelé (règle des Hooks) ; sans effet pour la démo (worldAnchor fictive, jamais lue).
   const floatingOrigin = useFloatingOrigin(world.kind === 'roads' ? world.worldAnchor : { latitudeDeg: 0, longitudeDeg: 0 }, telemetryRef);
@@ -104,11 +136,43 @@ export function DrivingScene({
             modelUrl={carModelUrl}
             config={vehicle}
             wheelPosesOutRef={wheelPosesRef}
+            respawnPoseRef={field ? playerRespawnPoseRef : undefined}
           />
           <FloatingOriginApplier origin={floatingOrigin} />
           <ChaseCamera bodyRef={bodyRef} snapVersion={respawnVersion} effects={cameraEffects} />
           <TireEffects wheelPosesRef={wheelPosesRef} bodyRef={bodyRef} paused={paused} />
           <AudioDriver bodyRef={bodyRef} telemetryRef={telemetryRef} vehicle={vehicle} carId={carId} paused={paused} respawnVersion={respawnVersion} />
+          {world.kind === 'circuit' && race && (
+            <RaceDriver track={world.track} bodyRef={bodyRef} respawnVersion={respawnVersion} referenceProfileS={race.referenceProfileS} ghost={race.ghost} ghostHeightM={vehicleSpawnHeightM(vehicle) * 0.6} onLapGhost={race.onLapGhost} onSnapshot={race.onSnapshot} onEvent={race.onEvent} />
+          )}
+          {world.kind === 'circuit' && autopilot && (
+            <PlayerAutopilot track={world.track} config={vehicle} bodyRef={bodyRef} input={input} telemetryRef={telemetryRef} respawnVersion={respawnVersion} />
+          )}
+          {world.kind === 'circuit' && field && (
+            <>
+              {field.opponents.map((opponent, index) => (
+                <OpponentCar
+                  key={opponent.id}
+                  spec={opponent}
+                  track={world.track}
+                  config={vehicle}
+                  modelUrl={field.opponentModelUrl}
+                  bodyRef={opponentBodies[index].bodyRef}
+                  goRef={goRef}
+                />
+              ))}
+              <RaceDirector
+                track={world.track}
+                totalLaps={field.laps}
+                config={vehicle}
+                playerBodyRef={bodyRef}
+                opponents={opponentBodies}
+                goRef={goRef}
+                respawnPoseRef={playerRespawnPoseRef}
+                onState={field.onState}
+              />
+            </>
+          )}
           <PerfProbe />
         </Suspense>
       </Physics>

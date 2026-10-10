@@ -20,9 +20,14 @@ export interface VehiclePhysicsOptions {
    *  de la télémétrie — doc §6 : vérification de l'origine flottante « entre deux pas ».
    *  Absent par défaut : aucun changement de comportement pour la piste de démo. */
   onAfterStep?: (telemetry: VehicleTelemetry, body: RapierRigidBody) => void;
+  /**
+   * Vrai (défaut) pour la voiture du joueur : son pas règle l'horloge d'extrapolation visuelle (stepClock). Les voitures
+   * adverses ne doivent pas y toucher, sinon l'intervalle mesuré entre deux pas devient celui qui sépare deux voitures.
+   */
+  drivesClock?: boolean;
 }
 
-export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep }: VehiclePhysicsOptions) {
+export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true }: VehiclePhysicsOptions) {
   const { rapier } = useRapier();
   const simulation = useMemo(() => new VehicleSimulation(config), [config]);
   const telemetryDelay = useRef(0);
@@ -40,9 +45,9 @@ export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelP
     const body = bodyRef.current;
     if (!body) return;
     const solverStart = performance.now();
-    markPhysicsStep(solverStart);
+    if (drivesClock) markPhysicsStep(solverStart);
     const telemetry = simulation.step(world, rapier, body, input.current);
-    perfStats.vehicleSolverMs.push(performance.now() - solverStart);
+    if (drivesClock) perfStats.vehicleSolverMs.push(performance.now() - solverStart);
     telemetryRef.current = telemetry;
     afterStepCallback.current?.(telemetry, body);
     telemetryDelay.current += world.timestep;

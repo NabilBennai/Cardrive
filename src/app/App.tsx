@@ -18,10 +18,18 @@ import { GeoLoadError, loadRoadWorld, type LoadedRoadWorld } from './geoOrchestr
 import type { DrivingWorld } from './DrivingScene';
 import { Minimap } from '../ui/Minimap';
 import { CircuitMinimap } from '../ui/CircuitMinimap';
+import { LapHud } from '../ui/LapHud';
+import { RaceHud, RaceResults } from '../ui/RaceHud';
+import type { RaceState } from '../race/RaceDirector';
+import { buildRaceField, loadRaceSetup, saveRaceSetup, type RaceField, type RaceSetup } from '../race/raceSetup';
+import { useRaceSession } from '../race/useRaceSession';
 import { PerfOverlay } from '../debug/PerfOverlay';
 import { AudioSettingsPanel } from '../audio/AudioSettingsPanel';
 import { loadAudioSettings, saveAudioSettings, type AudioSettings } from '../audio/audioSettings';
 import { getGameAudio } from '../audio/GameAudio';
+
+/** Crochet de test : `?autopilot` fait conduire la voiture du joueur par le pilote automatique (circuits uniquement). */
+const autopilotRequested = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('autopilot');
 
 const isTouchDevice = typeof window !== 'undefined' && (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
 
@@ -92,6 +100,12 @@ export function App() {
   const [showCarPicker, setShowCarPicker] = useState(false);
   const [showCircuitPicker, setShowCircuitPicker] = useState(false);
   const [circuitTrack, setCircuitTrack] = useState<CircuitTrack | null>(null);
+  const [raceSetup, setRaceSetup] = useState<RaceSetup>(loadRaceSetup);
+  const chooseRaceSetup = useCallback((next: RaceSetup) => { setRaceSetup(next); saveRaceSetup(next); }, []);
+  // Course : grille et adversaires de la partie en cours (null en contre-la-montre), état du chef de course, numéro de manche (remonte la scène).
+  const [raceField, setRaceField] = useState<RaceField | null>(null);
+  const [raceState, setRaceState] = useState<RaceState | null>(null);
+  const [raceRun, setRaceRun] = useState(0);
   const [selectedCarId, setSelectedCarId] = useState(loadSelectedCarId);
   const selectedCar = findCar(selectedCarId);
   const vehicleConfig = useMemo(() => vehicleConfigFor(selectedCarId), [selectedCarId]);
@@ -115,6 +129,8 @@ export function App() {
     geoAbortRef.current = controller;
     setLastPlace(place);
     setCircuitTrack(null);
+    setRaceField(null);
+    setRaceState(null);
     setRenderAnchor(null);
     setZoneUnavailable(false);
     setGeoScreen({ kind: 'loading' });
@@ -137,6 +153,8 @@ export function App() {
   const startDemoTrack = useCallback(() => {
     geoAbortRef.current?.abort();
     setCircuitTrack(null);
+    setRaceField(null);
+    setRaceState(null);
     setUseDemoTrack(true);
     setRenderAnchor(null);
     setZoneUnavailable(false);
@@ -150,6 +168,10 @@ export function App() {
     geoAbortRef.current?.abort();
     const track = buildCircuitTrack(source);
     setCircuitTrack(track);
+    setRaceField(raceSetup.mode === 'race' ? buildRaceField(raceSetup, track) : null);
+    setRaceState(null);
+    setRaceRun((value) => value + 1);
+    setRespawnVersion(0);
     setLastPlace(track.anchor);
     setUseDemoTrack(false);
     setRenderAnchor(null);
@@ -159,13 +181,35 @@ export function App() {
     setPlaying(true);
     setPaused(false);
     requestAnimationFrame(() => gameFocus.current?.focus());
-  }, []);
+  }, [raceSetup]);
   const onTelemetry = useCallback((next: VehicleTelemetry) => {
     telemetryRef.current = next;
     setTelemetry(next);
   }, []);
   const startGame = useCallback(() => {
+    setCircuitTrack(null);
+    setRaceField(null);
+    setRaceState(null);
+    setUseDemoTrack(true);
     setPlaying(true);
+    setPaused(false);
+    requestAnimationFrame(() => gameFocus.current?.focus());
+  }, []);
+  /** Retour au menu principal depuis une partie (la scène est démontée, tout l'état de partie est remis à zéro). */
+  const quitToMenu = useCallback(() => {
+    setPlaying(false);
+    setPaused(false);
+    setCircuitTrack(null);
+    setRaceField(null);
+    setRaceState(null);
+    setUseDemoTrack(true);
+    setRespawnVersion(0);
+  }, []);
+  /** Nouvelle manche sur le même circuit, mêmes réglages : la scène est remontée pour repartir de la grille. */
+  const replayRace = useCallback(() => {
+    setRaceState(null);
+    setRespawnVersion(0);
+    setRaceRun((value) => value + 1);
     setPaused(false);
     requestAnimationFrame(() => gameFocus.current?.focus());
   }, []);
@@ -197,6 +241,17 @@ export function App() {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
+  const raceSession = useRaceSession(circuitTrack?.id ?? null, selectedCarId);
+  const raceProps = useMemo(
+    () => (circuitTrack ? { referenceProfileS: raceSession.referenceProfileS, ghost: raceSession.ghost, onLapGhost: raceSession.onLapGhost, onSnapshot: raceSession.onSnapshot, onEvent: raceSession.onEvent } : undefined),
+    [circuitTrack, raceSession.referenceProfileS, raceSession.ghost, raceSession.onLapGhost, raceSession.onSnapshot, raceSession.onEvent],
+  );
+
+  const fieldProps = useMemo(
+    () => (raceField ? { laps: raceField.laps, opponents: raceField.opponents, playerSlot: raceField.playerSlot, opponentModelUrl: carModelUrl(selectedCar), onState: setRaceState } : undefined),
+    [raceField, selectedCar],
+  );
+
   const physicsPaused = useMemo(() => !playing || paused || tabHidden, [playing, paused, tabHidden]);
   const drivingWorld: DrivingWorld = useMemo(
     () => (circuitTrack
@@ -218,7 +273,7 @@ export function App() {
       aria-label="Cardrive, simulateur de conduite"
     >
       {playing && (
-        <SceneErrorBoundary key={sceneAttempt} onRetry={() => setSceneAttempt((value) => value + 1)}>
+        <SceneErrorBoundary key={`${sceneAttempt}:${raceRun}`} onRetry={() => setSceneAttempt((value) => value + 1)}>
           <Suspense fallback={<div className="scene-loading"><span className="spinner" /> Chargement de la piste…</div>}>
             <DrivingScene
               bodyRef={vehicleBody}
@@ -234,13 +289,16 @@ export function App() {
               vehicle={vehicleConfig}
               carId={selectedCarId === 'prototype' ? null : selectedCarId}
               cameraEffects={audioSettings.cameraEffects}
+              race={raceProps}
+              field={fieldProps}
+              autopilot={autopilotRequested}
             />
           </Suspense>
         </SceneErrorBoundary>
       )}
 
       {!playing && showCircuitPicker && (
-        <CircuitPicker onChoose={startCircuit} onBack={() => setShowCircuitPicker(false)} />
+        <CircuitPicker onChoose={startCircuit} onBack={() => setShowCircuitPicker(false)} records={raceSession.records} carId={selectedCarId} setup={raceSetup} onSetupChange={chooseRaceSetup} />
       )}
 
       {!playing && showCarPicker && (
@@ -296,6 +354,10 @@ export function App() {
         <TouchControls setStick={touchInput.setStick} setHandbrake={touchInput.setHandbrake} />
       )}
 
+      {playing && circuitTrack && <LapHud state={raceSession.hud} notice={raceSession.notice} />}
+      {playing && circuitTrack && raceField && <RaceHud state={raceState} />}
+      {playing && raceField && raceState?.playerFinished && <RaceResults state={raceState} onReplay={replayRace} onQuit={quitToMenu} />}
+
       {playing && circuitTrack && (
         <div className="minimap-panel">
           <CircuitMinimap track={circuitTrack} positionM={telemetry.positionM} headingRad={telemetry.headingRad} />
@@ -320,6 +382,7 @@ export function App() {
             <p>{tabHidden ? 'La simulation a été suspendue quand vous avez quitté l’onglet.' : 'La simulation est suspendue.'}</p>
             <button className="btn" onClick={resumeGame}>Reprendre</button>
             <button className="btn-quiet" onClick={respawn}>Repositionner la voiture</button>
+            <button className="btn-quiet" onClick={quitToMenu}>Quitter vers le menu</button>
             <AudioSettingsPanel settings={audioSettings} onChange={updateAudioSettings} />
             <dl className="controls-list">
               <dt><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Accélérer, braquer, freiner</dd>

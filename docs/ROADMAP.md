@@ -160,34 +160,38 @@ Le jeu était muet : c’est ce qui lui retirait le plus de vie. Tout est synth�
 
 ---
 
-## 5. Phase 2 — Mode course
+## 5. Phase 2 — Mode course 🟡
 
-C’est le plus gros manque de gameplay : 24 circuits existent, mais rien ne les transforme en course.
+24 circuits existaient mais rien ne les transformait en course. Désormais : contre-la-montre chronométré, records, fantôme et course contre des pilotes automatiques. Modes de jeu au choix dans l’écran « Circuits F1 2026 ».
 
-### R-2.1 Chronométrage et tours — M ⬜
-- **Approche** : la ligne centrale est fermée et la ligne de départ connue (`track.startLine`). Calculer l’abscisse curviligne de la voiture par projection sur la ligne centrale (grille déjà utilisée pour les murs) ; détecter le franchissement de la ligne ; secteurs = tiers du tour.
-- **Anti-triche** : exiger le passage par tous les secteurs dans l’ordre ; invalider un tour si la voiture est restée plus de N secondes hors piste ou repositionnée (`R`).
-- **Fin** : chrono du tour courant, meilleur tour, dernier tour, delta ; tests unitaires sur la détection (tour normal, marche arrière sur la ligne, raccourci).
+### R-2.1 Chronométrage et tours ✅
+- Projection de la voiture sur la ligne centrale (`TrackProjector`, recherche locale puis globale), progression « déroulée » et 60 portes par tour (3 secteurs). Une porte ne se franchit qu’une fois, dans l’ordre : reculer sur la ligne puis la repasser ne compte pas. Le temps est celui de la simulation (la pause l’arrête) et le franchissement est interpolé dans le pas.
+- Anti-triche : tour invalide après un saut de progression (raccourci, > 25 m en un pas) ou plus de 6 s cumulées hors piste (vibreurs tolérés) ; `R` perd le tour et le chrono attend la ligne.
+- HUD : tour courant, écart en direct au meilleur tour (profil de temps aux portes), meilleur, dernier, message de secteur.
+- Vérifié : tests unitaires (cercle synthétique : tour normal, marche arrière, raccourci, hors piste, repositionnement) ; **tours complets avec le vrai solveur** sur Monaco, Monza, Singapour et Suzuka par le pilote automatique ; e2e (départ du chrono, avancement, repositionnement) ; e2e `--full-lap` : un tour complet de Monaco dans le navigateur.
 
-### R-2.2 Records sauvegardés — S/M ⬜
-- Meilleur tour par couple circuit × voiture, en `localStorage` (même approche que les lieux récents et le choix de voiture), format versionné ; écran « Records » dans le menu.
-- **Piège** : le stockage peut être indisponible : toujours en `try/catch`, jamais bloquant.
+### R-2.2 Records sauvegardés ✅ (sans écran dédié)
+- Meilleur tour par circuit × véhicule dans `localStorage` (`cardrive.records`, versionné, assaini, jamais bloquant). Il s’affiche sur la carte du circuit. Pas d’écran « Records » séparé : à ajouter si le besoin se confirme.
 
-### R-2.3 Fantôme du meilleur tour — M ⬜
-- Enregistrer position et cap à fréquence fixe (par ex. 20 Hz), rejouer un modèle translucide interpolé ; stocker compressé (delta + quantification).
-- **Dépend de** : R-2.1, R-2.2.
+### R-2.3 Fantôme du meilleur tour 🟡
+- Trace à 20 Hz (position et cap) enregistrée à chaque tour et conservée avec le record (différences entières, ≈ 25 Ko par tour, 12 fantômes au plus). Rejouée en boîte translucide, extrapolée comme la voiture.
+- Vérifié : encodage / décodage / interpolation (dont le passage de ±π), limite et données corrompues (tests unitaires) ; enregistrement, record et fantôme sauvegardés après un tour complet (e2e `--full-lap`). **Non vérifié visuellement** : l’aspect du fantôme à l’écran n’a été examiné que sur la capture du tour 2 du scénario `--full-lap`.
 
-### R-2.4 Pilotes IA — L ⬜
-- **Approche** : une IA qui suit la ligne centrale avec une **vitesse cible par virage** calculée depuis la courbure (v² = μ·g·R, plafonnée par la puissance et le freinage de la voiture via `vehicleConfigFor`), pilotage par poursuite de point, et les mêmes commandes que le joueur (`VehicleInput`) pour utiliser **le même solveur**.
-- **Étapes** : (1) un adversaire isolé, (2) évitement simple et dépassement, (3) niveaux de difficulté (marge de vitesse), (4) plusieurs voitures et coût des colliders.
-- **Risques** : les virages issus de tracés à la main sont approximatifs (rayons surestimés → IA trop prudente ou, à l’inverse, trop optimiste) ; prévoir un réglage par circuit. Performance : N solveurs de véhicule par pas physique.
+### R-2.4 Pilotes IA ✅ (niveau « simulation », pas d’évitement actif)
+- **Même solveur, mêmes commandes** que le joueur : `AiDriver` produit un `VehicleInput` (accélérateur, frein, volant). Plan de vitesse par virage (v² = a_lat / κ, plafonné par la traînée) propagé vers l’arrière avec le freinage ; poursuite de point ; antipatinage, dosage du frein quand l’adhérence est sollicitée, réduction automatique de la vitesse en virage si la voiture glisse (pneus froids) ; remise en piste d’une voiture bloquée plus de 4 s.
+- Niveau 0..1 : 60-100 % de l’adhérence et du freinage utilisés, 80-100 % de la vitesse de pointe. Écart mesuré (Monza, voiture de sport) : +11 % de temps au tour au niveau le plus bas.
+- Vérifié (tests, vrai solveur et vrais murs) : 17 voitures du catalogue sur Monaco, la plupart aussi sur Suzuka ; 4 circuits en tours multiples, réguliers et valides ; course simulée à 6 voitures avec collisions (tout le monde termine, ordre cohérent avec les niveaux, 0 à 1 remise en piste par voiture).
+- **Limites connues** : (1) pas d’évitement ni de dépassement actif : les voitures roulent sur la ligne centrale et se gênent ou se touchent ; (2) la monoplace thermique (« race ») devient instable au-delà d’environ 200 km/h avec le solveur actuel (l’arrière part sans que le braquage suffise) : le pilote est plafonné à 180 km/h pour elle, la monoplace électrique reste stable à 315 km/h — à reprendre avec l’aérodynamique (R-3.4) ; (3) le tracteur ne boucle pas toujours Monaco sans sortir de la piste ; (4) toutes les voitures ont la carrosserie du joueur (pas de couleurs distinctes) ; (5) coût mesuré pour 5 adversaires non établi en rendu matériel au-delà du scénario e2e (100 img/s plafonné).
 
-### R-2.5 Départ, drapeaux et classement — M ⬜
-- Grille de départ, feux de départ, faux départ, classement en direct, arrivée au bout de N tours, écran de résultats. Voiture-balai / limiteur de pit non requis au début.
-- **Dépend de** : R-2.1, R-2.4.
+### R-2.5 Départ, drapeaux et classement 🟡
+- Livré : grille de départ à deux files, feux (3 feux, extinction après 0,8 s), faux départ (déplacement > 1,5 m avant l’extinction : +5 s), compte des tours, classement en direct, arrivée au dernier tour, tableau de résultats avec temps (pénalité comprise), « Rejouer » et « Retour au menu ».
+- Absents : drapeaux (jaune, bleu), voiture de sécurité, arrêts aux stands. À la fin de la course du joueur, les adversaires non arrivés sont listés « en course ».
 
-### R-2.6 Modes complémentaires — M chacun ⬜
-- **Contre-la-montre** (tours illimités, fantôme), **dérive** (score selon angle × vitesse × durée, utilisable dès maintenant sur un parking de piste), **slalom/coupe** de cônes sur la piste d’essai.
+### R-2.6 Modes complémentaires ⬜
+- Le **contre-la-montre** existe (mode par défaut) ; dérive et slalom restent à faire.
+
+### Outils de test associés
+- `?autopilot` dans l’adresse : le pilote automatique conduit la voiture du joueur sur un circuit (crochet de test et de démonstration). `npm run e2e -- --full-lap` s’en sert pour valider un tour complet dans le navigateur.
 
 ---
 
