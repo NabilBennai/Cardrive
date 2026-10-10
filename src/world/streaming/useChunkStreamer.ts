@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { unprojectFromLocal, type GeoAnchor } from '../../geo/projection.ts';
 import { openGeoCache, readGeoCache, writeGeoCache } from '../../map/geoCache.ts';
 import type { RawOsmData } from '../../map/geoProvider.ts';
-import { OverpassProvider } from '../../map/overpassProvider.ts';
+import { perfStats } from '../../debug/perfStats.ts';
+import { OverpassProvider, sharedMirrorHealth } from '../../map/overpassProvider.ts';
 import type { VehicleTelemetry } from '../../shared/types.ts';
 import {
   CHUNK_FETCH_MARGIN_M, chunkBoundsGeo, chunkKeyForGeoPoint, chunkKeyToString,
@@ -13,6 +14,14 @@ import { buildStreamedChunk, splitRawByChunk, splitWaterByChunk, type StreamedCh
 import { ChunkStore, FAILURE_BACKOFF_MS } from './chunkStateMachine.ts';
 
 export type { StreamedChunk } from './chunkOwnership.ts';
+
+/** Construit un chunk en mesurant sa durée (visible dans le panneau de performance, F3). */
+function timedBuild(...args: Parameters<typeof buildStreamedChunk>): StreamedChunk {
+  const start = performance.now();
+  const chunk = buildStreamedChunk(...args);
+  perfStats.chunkBuildMs.push(performance.now() - start);
+  return chunk;
+}
 
 export interface ChunkStreamerHandle {
   activeChunks: StreamedChunk[];
@@ -46,10 +55,11 @@ export function useChunkStreamer(
     for (const chunk of initialChunks) initialStore.markGenerated(chunk.key, chunk);
     return initialStore;
   });
-  const [provider] = useState(() => new OverpassProvider());
+  const [provider] = useState(() => new OverpassProvider(undefined, sharedMirrorHealth));
   const dbRef = useRef<IDBDatabase | null>(null);
   const fetchLockRef = useRef(false);
   const timeSinceCheckRef = useRef(0);
+  const lastVehicleKeyRef = useRef<string | null>(null);
 
   const [activeChunks, setActiveChunks] = useState<StreamedChunk[]>(() => initialChunks.slice());
   const [zoneUnavailable, setZoneUnavailable] = useState(false);
@@ -66,7 +76,7 @@ export function useChunkStreamer(
       const cachedRoads = db ? await readGeoCache(db, `${provider.id}-roads-chunk`, bounds).catch(() => null) : null;
       const cachedBuildings = db ? await readGeoCache(db, `${provider.id}-buildings-chunk`, bounds).catch(() => null) : null;
       const cachedWater = db ? await readGeoCache(db, `${provider.id}-water-chunk`, bounds).catch(() => null) : null;
-      if (cachedRoads && cachedBuildings && cachedWater) store.markGenerated(key, buildStreamedChunk(key, worldAnchor, cachedRoads, cachedBuildings, cachedWater));
+      if (cachedRoads && cachedBuildings && cachedWater) store.markGenerated(key, timedBuild(key, worldAnchor, cachedRoads, cachedBuildings, cachedWater));
       else stillMissing.push(key);
     }
     if (stillMissing.length === 0) return;
@@ -89,7 +99,7 @@ export function useChunkStreamer(
         const roadRaw = roadBuckets.get(keyStr) ?? EMPTY_RAW;
         const buildingRaw = buildingBuckets.get(keyStr) ?? EMPTY_RAW;
         const waterChunkRaw = waterBuckets.get(keyStr) ?? EMPTY_RAW;
-        store.markGenerated(key, buildStreamedChunk(key, worldAnchor, roadRaw, buildingRaw, waterChunkRaw));
+        store.markGenerated(key, timedBuild(key, worldAnchor, roadRaw, buildingRaw, waterChunkRaw));
         if (db) {
           const chunkBounds = chunkBoundsGeo(key, worldAnchor, CHUNK_FETCH_MARGIN_M);
           writeGeoCache(db, `${provider.id}-roads-chunk`, chunkBounds, roadRaw).catch(() => {});
@@ -114,6 +124,9 @@ export function useChunkStreamer(
     const geoPoint = unprojectFromLocal({ xM: telemetry.positionM.xM, yM: 0, zM: telemetry.positionM.zM }, renderAnchor);
     const vehicleKey = chunkKeyForGeoPoint(geoPoint, worldAnchor);
     const renderKeys = neighborhood(vehicleKey, RENDER_RADIUS_CHUNKS);
+    const vehicleKeyString = chunkKeyToString(vehicleKey);
+    if (lastVehicleKeyRef.current !== null && lastVehicleKeyRef.current !== vehicleKeyString) perfStats.world.chunkCrossings += 1;
+    lastVehicleKeyRef.current = vehicleKeyString;
 
     store.evictOutside(renderKeys);
     store.markActive(renderKeys);
@@ -129,10 +142,14 @@ export function useChunkStreamer(
     const nowMs = Date.now();
     const nextActive: StreamedChunk[] = [];
     let nextUnavailable = false;
+    let failedChunks = 0;
     for (const [, record] of store.entries()) {
       if ((record.state === 'active' || record.state === 'generated') && record.chunk) nextActive.push(record.chunk);
+      if (record.state === 'failed') failedChunks += 1;
       if (record.state === 'failed' && nowMs - (record.failedAtMs ?? 0) < FAILURE_BACKOFF_MS * 3) nextUnavailable = true;
     }
+    perfStats.world.activeChunks = nextActive.length;
+    perfStats.world.failedChunks = failedChunks;
     // Même contenu qu'avant : on garde la référence pour ne pas invalider les mémos en aval (trottoirs inter-chunks) toutes les 0,4 s.
     setActiveChunks((previous) => (previous.length === nextActive.length && previous.every((chunk) => nextActive.includes(chunk)) ? previous : nextActive));
     setZoneUnavailable(nextUnavailable);

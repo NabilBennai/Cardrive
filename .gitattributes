@@ -1,0 +1,6 @@
+# Fins de ligne : LF dans le dépôt et dans la copie de travail (évite les avertissements LF/CRLF à chaque commit sous Windows).
+* text=auto eol=lf
+*.png binary
+*.glb binary
+*.jpg binary
+*.ico binary

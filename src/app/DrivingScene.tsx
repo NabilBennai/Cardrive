@@ -4,6 +4,7 @@ import { Suspense, useEffect } from 'react';
 import type { GeoAnchor } from '../geo/projection';
 import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../shared/types';
 import { ChaseCamera } from '../camera/ChaseCamera';
+import { PerfProbe } from '../debug/PerfProbe';
 import { CircuitScene } from '../circuits/CircuitScene';
 import type { CircuitTrack } from '../circuits/circuitGeometry';
 import { GenericCar } from '../vehicle/rendering/GenericCar';
@@ -93,6 +94,7 @@ export function DrivingScene({
             modelUrl={carModelUrl}
             config={vehicle}
           />
+          <PerfProbe />
           <ChaseCamera bodyRef={bodyRef} snapVersion={cameraSnapVersion} />
         </Suspense>
       </Physics>

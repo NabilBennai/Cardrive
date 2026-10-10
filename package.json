@@ -11,7 +11,9 @@
     "calibrate": "node --experimental-strip-types scripts/calibrate-vehicle.mjs",
     "measure-catalog": "node --experimental-strip-types scripts/measure-catalog.mjs",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "npm run build && node scripts/e2e/run.mjs",
+    "e2e:update": "npm run build && node scripts/e2e/run.mjs --update"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.19.2",

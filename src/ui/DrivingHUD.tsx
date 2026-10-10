@@ -4,6 +4,8 @@ import type { VehicleTelemetry } from '../shared/types';
 interface DrivingHUDProps {
   /** Régime maximal du moteur du véhicule (tr/min) : échelle de la barre de régime. */
   maxRpm: number;
+  /** Température de bande de roulement d'adhérence maximale (°C) : les seuils froid / chaud s'en déduisent. */
+  tireOptimalC: number;
   telemetry: VehicleTelemetry;
   paused: boolean;
   onPause: () => void;
@@ -14,14 +16,16 @@ interface DrivingHUDProps {
 const kmh = (speedMps: number) => Math.round(Math.abs(speedMps) * 3.6);
 
 const TIRE_LABELS = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'];
-// Repères approximatifs d'une fenêtre de température pneu (froid / optimal / surchauffe) :
-// cohérents avec le réglage physique (ambiant 20°C, optimal 85°C) sans y être couplés en dur.
-const tireStatus = (tempC: number) => (tempC < 55 ? 'cold' : tempC > 115 ? 'hot' : 'optimal');
+// Un pneu est « froid » en dessous de l'optimum − 25 °C (l'adhérence perd alors plus de 2 %), « chaud » au-dessus
+// de l'optimum + 30 °C (la gomme commence à se dégrader) : seuils relatifs à l'optimum du véhicule affiché.
+const COLD_BELOW_OPTIMAL_C = 25;
+const HOT_ABOVE_OPTIMAL_C = 30;
+const tireStatus = (tempC: number, optimalC: number) => (tempC < optimalC - COLD_BELOW_OPTIMAL_C ? 'cold' : tempC > optimalC + HOT_ABOVE_OPTIMAL_C ? 'hot' : 'optimal');
 const REDLINE_SHARE = 0.82;
 /** Le glissement de la télémétrie est normalisé : 1 = pic d'adhérence du pneu. Au-delà de 1,15 le pneu glisse franchement. */
 const GRIP_LIMIT_SLIP = 1.15;
 
-export function DrivingHUD({ maxRpm, telemetry, paused, onPause, zoneUnavailable }: DrivingHUDProps) {
+export function DrivingHUD({ maxRpm, tireOptimalC, telemetry, paused, onPause, zoneUnavailable }: DrivingHUDProps) {
   const [showDetails, setShowDetails] = useState(false);
   const rpmShare = Math.min(1, telemetry.engineRpm / maxRpm);
   const gripLimit = telemetry.slip > GRIP_LIMIT_SLIP;
@@ -51,7 +55,7 @@ export function DrivingHUD({ maxRpm, telemetry, paused, onPause, zoneUnavailable
             {telemetry.tireTemperaturesC.map((tempC, index) => (
               <div key={TIRE_LABELS[index]} className="detail-row">
                 <span>{TIRE_LABELS[index]}</span>
-                <b className={tireStatus(tempC)}>{Math.round(tempC)} °C</b>
+                <b className={tireStatus(tempC, tireOptimalC)}>{Math.round(tempC)} °C</b>
               </div>
             ))}
           </div>

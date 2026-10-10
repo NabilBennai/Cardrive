@@ -1,0 +1,16 @@
+Cardrive — attributions et licences des éléments tiers
+
+Données cartographiques
+  © contributeurs OpenStreetMap, licence ODbL — https://www.openstreetmap.org/copyright
+  Routes, bâtiments et eau : API Overpass (miroirs publics). Géocodage : Nominatim. Tuiles de la mini-carte : tile.openstreetmap.org
+  (usage léger, voir la politique d'usage des tuiles OSM).
+
+Tracés des circuits de Formule 1 (src/circuits/f1Circuits2026.ts)
+  bacinger/f1-circuits — https://github.com/bacinger/f1-circuits — licence MIT, © 2019-2025 Tomislav Bacinger.
+  Les circuits sont des tracés géographiques : aucun logo, nom d'équipe ni marque n'est reproduit.
+
+Modèles de voitures (public/models/cars/)
+  Car Kit de Kenney — https://kenney.nl/assets/car-kit — licence CC0 1.0 (domaine public).
+  Texte de la licence : public/models/cars/LICENSE-kenney-car-kit.txt
+
+Bibliothèques : voir package.json (three.js, React Three Fiber, Rapier, React, Vite — licences MIT / Apache-2.0).

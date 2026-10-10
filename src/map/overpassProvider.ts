@@ -1,14 +1,20 @@
 import { parseWaterResponse } from './waterParse.ts';
 import { GeoProviderError, type GeoBounds, type GeoProvider, type RawOsmData, type RawOsmNode, type RawOsmWay } from './geoProvider.ts';
 
-// Plusieurs miroirs publics, essayés dans l'ordre : l'instance officielle sature/rate-limit
-// facilement sous usage ponctuel (observé en session : « Service saturé » sur une seule
-// requête). kumi.systems et osm.ch sont des miroirs communautaires réputés plus disponibles
-// pour ce genre d'usage. Si VITE_OVERPASS_URL est défini, il est seul utilisé (pas de repli).
+// Plusieurs miroirs publics, essayés dans l'ordre (voir MirrorHealth : un miroir en échec est repoussé en fin de liste).
+// Vérifiés le 10 octobre 2026 avec une requête réelle depuis un navigateur (CORS ouvert) :
+//   - overpass.openstreetmap.fr et overpass.private.coffee : réponse complète en < 1 s, données mondiales ;
+//   - kumi.systems : répond HTTP 500 aux requêtes plus lourdes (la page d'erreur n'a pas d'en-tête CORS, d'où une erreur
+//     « CORS » trompeuse en console) ;
+//   - overpass-api.de : instance officielle, régulièrement saturée (504 / délai dépassé) ;
+//   - osm.ch : miroir suisse à couverture partielle, il répond vide sans erreur hors de Suisse → en dernier recours.
+// Si VITE_OVERPASS_URL est défini, il est seul utilisé (pas de repli). Usage léger : une requête par lot de chunks, mis en cache.
 const DEFAULT_OVERPASS_URLS = [
+  'https://overpass.openstreetmap.fr/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.osm.ch/api/interpreter',
   'https://overpass-api.de/api/interpreter',
+  'https://overpass.osm.ch/api/interpreter',
 ];
 const OVERPASS_URLS = import.meta.env.VITE_OVERPASS_URL ? [import.meta.env.VITE_OVERPASS_URL] : DEFAULT_OVERPASS_URLS;
 const OVERPASS_TIMEOUT_S = 25;
@@ -112,11 +118,55 @@ async function fetchFrom(baseUrl: string, query: string, signal: AbortSignal, pa
   return parse(body);
 }
 
+const FAILURE_COOLDOWN_BASE_MS = 30_000;
+const FAILURE_COOLDOWN_MAX_MS = 5 * 60_000;
+/** Une réponse vide « suspecte » compte moins qu'une vraie panne (le miroir est peut-être simplement à couverture partielle). */
+const EMPTY_RESPONSE_WEIGHT = 0.5;
+
+/**
+ * Mémorise la santé des miroirs pendant la session : un miroir qui vient d'échouer (HTTP 500, délai dépassé, réponse
+ * vide suspecte) est repoussé en fin de liste pour un délai croissant (30 s, 1 min, 2 min… jusqu'à 5 min) au lieu d'être
+ * réessayé en premier à chaque requête — ce qui coûtait un aller-retour inutile et une erreur de console par chargement.
+ * Aucun miroir n'est jamais exclu : si tous sont pénalisés, on les essaie quand même, du plus anciennement fautif au plus récent.
+ */
+export class MirrorHealth {
+  private readonly failures = new Map<string, { score: number; lastMs: number }>();
+
+  constructor(private readonly now: () => number = Date.now) {}
+
+  recordSuccess(url: string) {
+    this.failures.delete(url);
+  }
+
+  recordFailure(url: string, weight = 1) {
+    const previous = this.failures.get(url);
+    this.failures.set(url, { score: (previous?.score ?? 0) + weight, lastMs: this.now() });
+  }
+
+  private isPenalized(url: string): boolean {
+    const failure = this.failures.get(url);
+    if (!failure || failure.score < 1) return false;
+    const cooldownMs = Math.min(FAILURE_COOLDOWN_MAX_MS, FAILURE_COOLDOWN_BASE_MS * 2 ** (Math.floor(failure.score) - 1));
+    return this.now() - failure.lastMs < cooldownMs;
+  }
+
+  /** Ordre d'essai : miroirs sains dans l'ordre d'origine, puis les pénalisés du plus ancien échec au plus récent. */
+  order(urls: string[]): string[] {
+    const healthy = urls.filter((url) => !this.isPenalized(url));
+    const penalized = urls.filter((url) => this.isPenalized(url))
+      .sort((a, b) => (this.failures.get(a)?.lastMs ?? 0) - (this.failures.get(b)?.lastMs ?? 0));
+    return [...healthy, ...penalized];
+  }
+}
+
+/** Instance partagée par l'application (chargement initial et streaming) : les miroirs défaillants sont connus de tous. Les tests créent la leur. */
+export const sharedMirrorHealth = new MirrorHealth();
+
 /** Seule implémentation concrète de GeoProvider pour cette étape : l'API Overpass publique, avec repli sur plusieurs miroirs. */
 export class OverpassProvider implements GeoProvider {
   readonly id = 'overpass';
 
-  constructor(private readonly baseUrls: string[] = OVERPASS_URLS) {}
+  constructor(private readonly baseUrls: string[] = OVERPASS_URLS, private readonly health: MirrorHealth = new MirrorHealth()) {}
 
   /**
    * Essaie chaque miroir dans l'ordre. `isAcceptable` permet de ne PAS se satisfaire d'une
@@ -128,14 +178,19 @@ export class OverpassProvider implements GeoProvider {
   private async fetchWithFallback(query: string, signal: AbortSignal, isAcceptable: (result: RawOsmData) => boolean, parse?: (body: unknown) => RawOsmData): Promise<RawOsmData> {
     let lastError: unknown;
     let lastEmptyResult: RawOsmData | null = null;
-    for (const baseUrl of this.baseUrls) {
+    for (const baseUrl of this.health.order(this.baseUrls)) {
       if (signal.aborted) throw lastError ?? new GeoProviderError('network', 'Requête annulée.');
       try {
         const result = await fetchFrom(baseUrl, query, signal, parse);
-        if (isAcceptable(result)) return result;
+        if (isAcceptable(result)) {
+          this.health.recordSuccess(baseUrl);
+          return result;
+        }
+        this.health.recordFailure(baseUrl, EMPTY_RESPONSE_WEIGHT);
         lastEmptyResult = result;
       } catch (error) {
         if (signal.aborted) throw error;
+        this.health.recordFailure(baseUrl);
         lastError = error;
       }
     }

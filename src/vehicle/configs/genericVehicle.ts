@@ -134,13 +134,14 @@ const genericVehicleDefinition: VehicleConfig = {
   serviceBrakeForceN: 10_300,
   handbrakeForceN: 4_680,
   aerodynamicDragCoefficient: 0.33,
-  frontalAreaM2: 2.69,
+  // ≈ 82 % du rectangle largeur × hauteur (1,667 × 1,523 m) : surface frontale réelle d'une citadine, et non la boîte englobante.
+  frontalAreaM2: 2.2,
   // Rapports de boîte manuelle 5 vitesses (BE4/5, PSA EP6) et pont, calés sur les
   // performances publiées (0-100 km/h ≈ 10,5 s, Vmax ≈ 188 km/h).
   gearRatios: [3.727, 2.048, 1.321, 0.971, 0.756],
   reverseGearRatio: 3.394,
   finalDriveRatio: 3.938,
-  drivetrainEfficiency: 0.92,
+  drivetrainEfficiency: 0.9,
   engineBrakeTorqueNm: 28,
   launchRpm: 2_000,
   engineResponsePerS: 8,
@@ -165,7 +166,9 @@ const genericVehicleDefinition: VehicleConfig = {
   rollingResistanceCoefficient: 0.012,
   maximumSuspensionForceN: 17_800,
   minimumSuspensionLengthM: 0.11,
-  linearDamping: 0.01,
+  // Aucun amortissement linéaire de Rapier : il ajoutait une traînée parasite proportionnelle à la vitesse (≈ 530 N à 173 km/h)
+  // qui doublait la vraie résistance de l'air. Toutes les résistances sont explicites (roulement, aéro, frein moteur, freins).
+  linearDamping: 0,
   angularDamping: 0.5,
   // Modèle thermique de pneu (nœud unique, carcasse) : la chaleur vient du travail de
   // glissement (dérive latérale + dépassement du grip disponible), le refroidissement

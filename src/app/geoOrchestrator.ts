@@ -1,7 +1,7 @@
 import type { GeoAnchor } from '../geo/projection.ts';
 import { GeoProviderError, type GeoProviderErrorKind, type RawOsmData } from '../map/geoProvider.ts';
 import { openGeoCache, readGeoCache, writeGeoCache } from '../map/geoCache.ts';
-import { OverpassProvider } from '../map/overpassProvider.ts';
+import { OverpassProvider, sharedMirrorHealth } from '../map/overpassProvider.ts';
 import { pickSpawnPose, type RoadSpawnPose } from '../world/roads/spawnPlacement.ts';
 import { buildStreamedChunk, splitRawByChunk, splitWaterByChunk, type StreamedChunk } from '../world/streaming/chunkOwnership.ts';
 import {
@@ -38,7 +38,7 @@ const SPAWN_CHUNK_KEY: ChunkKey = { x: 0, z: 0 };
  * étape 4, streaming de chunks.
  */
 export async function loadRoadWorld(place: GeoPoint, signal: AbortSignal): Promise<LoadedRoadWorld> {
-  const provider = new OverpassProvider();
+  const provider = new OverpassProvider(undefined, sharedMirrorHealth);
   const worldAnchor: GeoAnchor = place;
   const db = await openGeoCache().catch(() => null);
 

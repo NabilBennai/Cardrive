@@ -41,7 +41,7 @@ Constantes de temps obtenues (testées) : la bande rejoint la carcasse en ~30 s 
 
 ## Mesures
 
-`npm run measure-catalog` (0-100, vitesse de pointe, freinage) et `node --experimental-strip-types scripts/tire-diagnostics.mjs [id]` (séries temporelles par roue). Le prototype (1,6 VTi 120) donne 0-100 en 10,5 s (publié : 10,5-10,8 s) et 100 → 0 en 44 m pneus froids. La vitesse de pointe reste sous-estimée (163 km/h contre 188 publiés) : écart non traité.
+`npm run measure-catalog` (0-100, vitesse de pointe, freinage) et `node --experimental-strip-types scripts/tire-diagnostics.mjs [id]` (séries temporelles par roue). Le prototype (1,6 VTi 120) donne 0-100 en 9,9 s (publié : 10,5-10,8 s), 100 → 0 en 45 m pneus froids et 189 km/h en pointe (publié : 188). Deux résistances parasites ont été corrigées pour y arriver (voir la feuille de route, R-0.1) : l'amortissement linéaire de Rapier, qui retirait 1 % de la vitesse par seconde, et une surface frontale prise sur la boîte englobante au lieu de la section réelle.
 
 ## Limites
 

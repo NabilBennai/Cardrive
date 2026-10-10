@@ -1,6 +1,6 @@
 # Cardrive — Dossier d’architecture
 
-Statut : architecture cible ; l’état réel d’avancement, la dette connue et les évolutions prévues sont suivis dans la [feuille de route](../ROADMAP.md). Livré à ce jour : étapes 1 à 4 (véhicule, calibration, routes réelles GPS/Overpass, streaming de chunks), décor OSM (bâtiments, trottoirs, eau), catalogue de 17 véhicules à physique propre, 24 circuits de F1 2026, modèle de pneu à glissement avec thermique à deux nœuds, interface refondue. Non vérifié en conduite réelle : le streaming et l’origine flottante (scintillement au recentrage possible, voir `src/world/streaming/useFloatingOrigin.ts`) et la fluidité sur une machine de référence. Reste notamment : son, mode course, relief, déploiement.
+Statut : architecture cible ; l’état réel d’avancement, la dette connue et les évolutions prévues sont suivis dans la [feuille de route](../ROADMAP.md). Livré à ce jour : étapes 1 à 4 (véhicule, calibration, routes réelles GPS/Overpass, streaming de chunks), décor OSM (bâtiments, trottoirs, eau), catalogue de 18 véhicules à physique propre, 24 circuits de F1 2026, modèle de pneu à glissement avec thermique à deux nœuds, interface refondue. Non vérifié en conduite réelle : le streaming et l’origine flottante (scintillement au recentrage possible, voir `src/world/streaming/useFloatingOrigin.ts`) et la fluidité sur une machine de référence. Reste notamment : son, mode course, relief, déploiement.
 Langue de l’interface initiale : français.
 Déploiement cible : application statique sur Vercel, sans backend applicatif.
 

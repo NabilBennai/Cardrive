@@ -5,3 +5,5 @@ dist/
 .vercel/
 .env*
 kenney_car-kit/
+
+scripts/e2e/output/

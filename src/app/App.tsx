@@ -18,6 +18,7 @@ import { GeoLoadError, loadRoadWorld, type LoadedRoadWorld } from './geoOrchestr
 import type { DrivingWorld } from './DrivingScene';
 import { Minimap } from '../ui/Minimap';
 import { CircuitMinimap } from '../ui/CircuitMinimap';
+import { PerfOverlay } from '../debug/PerfOverlay';
 
 const isTouchDevice = typeof window !== 'undefined' && (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
 
@@ -76,6 +77,7 @@ export function App() {
 
   // Étape 3 : choix du lieu, chargement OSM/Overpass, piste de démo toujours disponible hors ligne.
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showPerf, setShowPerf] = useState(false);
   const [showCarPicker, setShowCarPicker] = useState(false);
   const [showCircuitPicker, setShowCircuitPicker] = useState(false);
   const [circuitTrack, setCircuitTrack] = useState<CircuitTrack | null>(null);
@@ -159,6 +161,14 @@ export function App() {
   const resumeGame = useCallback(() => {
     setPaused(false);
     requestAnimationFrame(() => gameFocus.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code === 'F3' && !event.repeat) { event.preventDefault(); setShowPerf((value) => !value); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   useEffect(() => {
@@ -256,7 +266,9 @@ export function App() {
         </section>
       )}
 
-      {playing && <DrivingHUD maxRpm={vehicleConfig.maximumRpm} telemetry={telemetry} paused={paused || tabHidden} onPause={pauseGame} zoneUnavailable={!useDemoTrack && zoneUnavailable} />}
+      {playing && <PerfOverlay visible={showPerf} />}
+
+      {playing && <DrivingHUD maxRpm={vehicleConfig.maximumRpm} tireOptimalC={vehicleConfig.tireOptimalTemperatureC} telemetry={telemetry} paused={paused || tabHidden} onPause={pauseGame} zoneUnavailable={!useDemoTrack && zoneUnavailable} />}
 
       {playing && isTouchDevice && !(paused || tabHidden) && (
         <TouchControls setStick={touchInput.setStick} setHandbrake={touchInput.setHandbrake} />

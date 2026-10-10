@@ -179,3 +179,10 @@ kbd { display: inline-grid; min-width: 24px; height: 24px; padding: 0 7px; place
 .circuit-info strong { color: var(--text); font-size: 16px; font-weight: 600; }
 .circuit-round { color: var(--accent); font-size: 12px; font-weight: 500; }
 .car-card-specs { color: var(--muted); font-size: 12px; line-height: 1.35; text-align: center; }
+
+/* ---------- Panneau de performance (F3) ---------- */
+.perf-overlay { position: absolute; top: calc(var(--gutter) + 56px); right: var(--gutter); z-index: 6; min-width: 260px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(8, 11, 15, .82); backdrop-filter: blur(10px); font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: none; }
+.perf-overlay h3 { margin: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 500; }
+.perf-row { display: flex; justify-content: space-between; gap: 18px; padding: 2px 0; }
+.perf-row span { color: var(--muted); }
+.perf-row.over-budget b { color: var(--danger); }

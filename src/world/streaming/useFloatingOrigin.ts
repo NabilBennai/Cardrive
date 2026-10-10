@@ -1,5 +1,6 @@
 import type { RapierRigidBody } from '@react-three/rapier';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { perfStats } from '../../debug/perfStats.ts';
 import { computeRecenterOffset, shouldRecenter } from '../../geo/floatingOrigin.ts';
 import type { GeoAnchor } from '../../geo/projection.ts';
 import { translateVehicleBody } from '../../vehicle/physics/vehicleBody.ts';
@@ -41,6 +42,7 @@ export function useFloatingOrigin(worldAnchor: GeoAnchor): FloatingOriginHandle 
     renderAnchorRef.current = nextAnchor;
     setRenderAnchor(nextAnchor);
     setCameraSnapVersion((value) => value + 1);
+    perfStats.world.recenters += 1;
   }, []);
 
   return { renderAnchor, cameraSnapVersion, onAfterPhysicsStep };

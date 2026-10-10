@@ -1,4 +1,5 @@
 import type { VehicleConfig } from '../../shared/types.ts';
+import { findCar } from '../catalog/carCatalog.ts';
 import { genericVehicle, validateVehicleConfig } from './genericVehicle.ts';
 
 export type DriveLayout = 'rwd' | 'fwd' | 'awd';
@@ -10,7 +11,6 @@ export type DriveLayout = 'rwd' | 'fwd' | 'awd';
  * le solveur, on change ses paramètres de façon cohérente avec la masse et le gabarit.
  */
 export interface VehicleProfile {
-  displayName: string;
   massKg: number;
   lengthM: number;
   widthM: number;
@@ -56,13 +56,13 @@ const BASE_POWER_KW = 88;
 const GRAVITY = 9.81;
 /** Rapport de la dernière vitesse (boîte seule) : la démultiplication finale est déduite de la vitesse de pointe visée. */
 const TOP_GEAR_RATIO = 0.8;
-/** La vitesse au régime de changement de rapport dépasse la vitesse de pointe réelle (limitée par la traînée). */
-const REDLINE_OVER_TOP_SPEED = 1.15;
+/** Vitesse au régime MAXIMAL en dernier rapport / vitesse de pointe visée (le rapport de coupure est à 6 400 tr/min pour 6 700 tr/min maximum, donc 0,96 ≈ 1 au régime maximal) : la démultiplication fixe la vitesse de pointe, comme une voiture bridée ; un véhicule moins puissant reste limité par la traînée en dessous. */
+const REDLINE_OVER_TOP_SPEED = 0.96;
 /** Fraction de la course de suspension écrasée sous le poids statique (celle du prototype). */
 const STATIC_SAG_FRACTION = 0.2;
 const DAMPING_RATIO = 0.55;
 
-export function deriveVehicleConfig(id: string, p: VehicleProfile): VehicleConfig {
+export function deriveVehicleConfig(id: string, displayName: string, p: VehicleProfile): VehicleConfig {
   const base = genericVehicle;
   const massRatio = p.massKg / base.massKg;
   const sizeFactor = ((p.lengthM / base.dimensionsM.lengthM) ** 2 + (p.widthM / base.dimensionsM.widthM) ** 2 + (p.heightM / base.dimensionsM.heightM) ** 2) / 3;
@@ -89,7 +89,7 @@ export function deriveVehicleConfig(id: string, p: VehicleProfile): VehicleConfi
   return validateVehicleConfig({
     ...base,
     id,
-    displayName: p.displayName,
+    displayName,
     assetProvenance: 'Profil dérivé du prototype calibré (voir vehicleProfiles.ts) ; habillage visuel : Kenney Car Kit (CC0).',
     massKg: p.massKg,
     dimensionsM: { lengthM: p.lengthM, widthM: p.widthM, heightM: p.heightM },
@@ -188,93 +188,93 @@ const profile = (p: Omit<VehicleProfile, keyof typeof DEFAULTS> & Partial<typeof
  */
 const PROFILES: Record<string, VehicleProfile> = {
   sedan: profile({
-    displayName: 'Berline', massKg: 1400, lengthM: 4.65, widthM: 1.82, heightM: 1.45, wheelbaseM: 2.75, trackWidthM: 1.56,
+    massKg: 1400, lengthM: 4.65, widthM: 1.82, heightM: 1.45, wheelbaseM: 2.75, trackWidthM: 1.56,
     powerKw: 145, topSpeedKmh: 215, firstGearOverall: 14.5, dragCoefficient: 0.29, frontalAreaM2: 2.2, drive: 'fwd',
   }),
   'sedan-sports': profile({
-    displayName: 'Berline sport', massKg: 1550, lengthM: 4.72, widthM: 1.86, heightM: 1.39, wheelbaseM: 2.82, trackWidthM: 1.6,
+    massKg: 1550, lengthM: 4.72, widthM: 1.86, heightM: 1.39, wheelbaseM: 2.82, trackWidthM: 1.6,
     powerKw: 330, topSpeedKmh: 270, firstGearOverall: 14, dragCoefficient: 0.3, frontalAreaM2: 2.15, drive: 'rwd',
     tireGrip: 1.25, brakeG: 1.05, stiffness: 1.35, cogHeightFraction: 0.33, rpmScale: 1.1, shiftDurationS: 0.2, maxSteeringRad: 0.56,
   }),
   'hatchback-sports': profile({
-    displayName: 'Compacte sport', massKg: 1250, lengthM: 4.1, widthM: 1.8, heightM: 1.43, wheelbaseM: 2.63, trackWidthM: 1.55,
+    massKg: 1250, lengthM: 4.1, widthM: 1.8, heightM: 1.43, wheelbaseM: 2.63, trackWidthM: 1.55,
     powerKw: 200, topSpeedKmh: 245, firstGearOverall: 14.2, dragCoefficient: 0.32, frontalAreaM2: 2.1, drive: 'fwd',
     tireGrip: 1.12, brakeG: 1.0, stiffness: 1.25, cogHeightFraction: 0.34, rpmScale: 1.05, shiftDurationS: 0.22, steeringRateRadPerS: 1.7,
   }),
   suv: profile({
-    displayName: 'SUV', massKg: 1950, lengthM: 4.8, widthM: 1.94, heightM: 1.75, wheelbaseM: 2.85, trackWidthM: 1.65,
+    massKg: 1950, lengthM: 4.8, widthM: 1.94, heightM: 1.75, wheelbaseM: 2.85, trackWidthM: 1.65,
     powerKw: 170, topSpeedKmh: 200, firstGearOverall: 16.5, dragCoefficient: 0.36, frontalAreaM2: 2.9, drive: 'awd',
     tireGrip: 1.0, brakeG: 0.9, stiffness: 0.95, cogHeightFraction: 0.42, maxSteeringRad: 0.55,
   }),
   'suv-luxury': profile({
-    displayName: 'SUV de luxe', massKg: 2300, lengthM: 5.0, widthM: 1.98, heightM: 1.78, wheelbaseM: 2.95, trackWidthM: 1.68,
+    massKg: 2300, lengthM: 5.0, widthM: 1.98, heightM: 1.78, wheelbaseM: 2.95, trackWidthM: 1.68,
     powerKw: 300, topSpeedKmh: 245, firstGearOverall: 16, dragCoefficient: 0.34, frontalAreaM2: 2.95, drive: 'awd',
     tireGrip: 1.05, brakeG: 0.95, stiffness: 1.1, cogHeightFraction: 0.41, rpmScale: 1.02, maxSteeringRad: 0.54,
   }),
   van: profile({
-    displayName: 'Fourgonnette', massKg: 2000, lengthM: 4.95, widthM: 1.95, heightM: 1.95, wheelbaseM: 3.0, trackWidthM: 1.66,
+    massKg: 2000, lengthM: 4.95, widthM: 1.95, heightM: 1.95, wheelbaseM: 3.0, trackWidthM: 1.66,
     powerKw: 110, topSpeedKmh: 165, firstGearOverall: 17, dragCoefficient: 0.37, frontalAreaM2: 3.3, drive: 'fwd',
     tireGrip: 0.92, brakeG: 0.85, stiffness: 0.9, cogHeightFraction: 0.45, rpmScale: 0.9, maxSteeringRad: 0.57,
   }),
   taxi: profile({
-    displayName: 'Taxi', massKg: 1500, lengthM: 4.7, widthM: 1.82, heightM: 1.5, wheelbaseM: 2.78, trackWidthM: 1.56,
+    massKg: 1500, lengthM: 4.7, widthM: 1.82, heightM: 1.5, wheelbaseM: 2.78, trackWidthM: 1.56,
     powerKw: 105, topSpeedKmh: 190, firstGearOverall: 15, dragCoefficient: 0.3, frontalAreaM2: 2.25, drive: 'fwd', rpmScale: 0.85, brakeG: 0.9,
   }),
   police: profile({
-    displayName: 'Police', massKg: 1850, lengthM: 5.0, widthM: 1.9, heightM: 1.5, wheelbaseM: 2.95, trackWidthM: 1.62,
+    massKg: 1850, lengthM: 5.0, widthM: 1.9, heightM: 1.5, wheelbaseM: 2.95, trackWidthM: 1.62,
     powerKw: 310, topSpeedKmh: 250, firstGearOverall: 14.5, dragCoefficient: 0.33, frontalAreaM2: 2.4, drive: 'awd',
     tireGrip: 1.08, brakeG: 1.0, stiffness: 1.15, cogHeightFraction: 0.38, rpmScale: 1.05, shiftDurationS: 0.22, maxSteeringRad: 0.56,
   }),
   race: profile({
-    displayName: 'Voiture de course', massKg: 800, lengthM: 4.5, widthM: 1.95, heightM: 1.05, wheelbaseM: 3.0, trackWidthM: 1.7,
+    massKg: 800, lengthM: 4.5, widthM: 1.95, heightM: 1.05, wheelbaseM: 3.0, trackWidthM: 1.7,
     powerKw: 650, topSpeedKmh: 340, firstGearOverall: 12, gears: 7, dragCoefficient: 0.6, frontalAreaM2: 1.4, drive: 'rwd',
     tireGrip: 1.8, brakeG: 1.9, stiffness: 2.0, cogHeightFraction: 0.27, rpmScale: 1.7, shiftDurationS: 0.1, maxSteeringRad: 0.42, steeringRateRadPerS: 2.2,
     wheelRadiusM: 0.33, suspensionScale: 0.6, tirePeakSlipAngleRad: 0.1, tireSlidingGripRatio: 0.88, tireOptimalTemperatureC: 95, tireLoadSensitivity: 0.1,
   }),
   'race-future': profile({
-    displayName: 'Course futuriste', massKg: 900, lengthM: 4.5, widthM: 1.95, heightM: 1.1, wheelbaseM: 3.0, trackWidthM: 1.7,
+    massKg: 900, lengthM: 4.5, widthM: 1.95, heightM: 1.1, wheelbaseM: 3.0, trackWidthM: 1.7,
     powerKw: 700, topSpeedKmh: 380, firstGearOverall: 11.5, gears: 7, dragCoefficient: 0.5, frontalAreaM2: 1.4, drive: 'awd',
     tireGrip: 2.0, brakeG: 2.1, stiffness: 2.2, cogHeightFraction: 0.26, rpmScale: 1.5, shiftDurationS: 0.08, maxSteeringRad: 0.42, steeringRateRadPerS: 2.4,
     wheelRadiusM: 0.33, suspensionScale: 0.6, tirePeakSlipAngleRad: 0.1, tireSlidingGripRatio: 0.88, tireOptimalTemperatureC: 95, tireLoadSensitivity: 0.1,
   }),
   delivery: profile({
-    displayName: 'Camionnette de livraison', massKg: 3500, lengthM: 5.8, widthM: 2.05, heightM: 2.6, wheelbaseM: 3.6, trackWidthM: 1.75,
+    massKg: 3500, lengthM: 5.8, widthM: 2.05, heightM: 2.6, wheelbaseM: 3.6, trackWidthM: 1.75,
     powerKw: 130, topSpeedKmh: 135, firstGearOverall: 22, dragCoefficient: 0.42, frontalAreaM2: 4.5, drive: 'rwd',
     tireGrip: 0.85, brakeG: 0.75, stiffness: 0.8, cogHeightFraction: 0.45, rpmScale: 0.75, shiftDurationS: 0.4, maxSteeringRad: 0.52, steeringRateRadPerS: 1.1,
     wheelRadiusM: 0.37, maximumReverseSpeedMps: 6,
   }),
   ambulance: profile({
-    displayName: 'Ambulance', massKg: 3300, lengthM: 5.9, widthM: 2.05, heightM: 2.45, wheelbaseM: 3.65, trackWidthM: 1.75,
+    massKg: 3300, lengthM: 5.9, widthM: 2.05, heightM: 2.45, wheelbaseM: 3.65, trackWidthM: 1.75,
     powerKw: 150, topSpeedKmh: 160, firstGearOverall: 21, dragCoefficient: 0.4, frontalAreaM2: 4.3, drive: 'rwd',
     tireGrip: 0.88, brakeG: 0.8, stiffness: 0.85, cogHeightFraction: 0.44, rpmScale: 0.78, shiftDurationS: 0.38, maxSteeringRad: 0.52, steeringRateRadPerS: 1.15,
     wheelRadiusM: 0.37, maximumReverseSpeedMps: 6,
   }),
   firetruck: profile({
-    displayName: 'Camion de pompiers', massKg: 12000, lengthM: 8.6, widthM: 2.5, heightM: 3.3, wheelbaseM: 5.0, trackWidthM: 2.0,
+    massKg: 12000, lengthM: 8.6, widthM: 2.5, heightM: 3.3, wheelbaseM: 5.0, trackWidthM: 2.0,
     powerKw: 300, topSpeedKmh: 115, firstGearOverall: 34, dragCoefficient: 0.55, frontalAreaM2: 7.5, drive: 'rwd',
     tireGrip: 0.8, brakeG: 0.65, stiffness: 0.7, cogHeightFraction: 0.45, rpmScale: 0.6, shiftDurationS: 0.5, maxSteeringRad: 0.46, steeringRateRadPerS: 0.9,
     wheelRadiusM: 0.5, suspensionScale: 1.2, maximumReverseSpeedMps: 5,
   }),
   'garbage-truck': profile({
-    displayName: 'Benne à ordures', massKg: 14000, lengthM: 8.0, widthM: 2.5, heightM: 3.4, wheelbaseM: 4.6, trackWidthM: 2.0,
+    massKg: 14000, lengthM: 8.0, widthM: 2.5, heightM: 3.4, wheelbaseM: 4.6, trackWidthM: 2.0,
     powerKw: 260, topSpeedKmh: 95, firstGearOverall: 36, dragCoefficient: 0.6, frontalAreaM2: 8, drive: 'rwd',
     tireGrip: 0.78, brakeG: 0.6, stiffness: 0.7, cogHeightFraction: 0.46, rpmScale: 0.6, shiftDurationS: 0.55, maxSteeringRad: 0.46, steeringRateRadPerS: 0.85,
     wheelRadiusM: 0.5, suspensionScale: 1.2, maximumReverseSpeedMps: 5,
   }),
   truck: profile({
-    displayName: 'Camion', massKg: 9000, lengthM: 7.5, widthM: 2.45, heightM: 3.2, wheelbaseM: 4.4, trackWidthM: 1.95,
+    massKg: 9000, lengthM: 7.5, widthM: 2.45, heightM: 3.2, wheelbaseM: 4.4, trackWidthM: 1.95,
     powerKw: 240, topSpeedKmh: 120, firstGearOverall: 30, dragCoefficient: 0.55, frontalAreaM2: 6.5, drive: 'rwd',
     tireGrip: 0.82, brakeG: 0.65, stiffness: 0.75, cogHeightFraction: 0.45, rpmScale: 0.62, shiftDurationS: 0.5, maxSteeringRad: 0.47, steeringRateRadPerS: 0.95,
     wheelRadiusM: 0.48, suspensionScale: 1.15, maximumReverseSpeedMps: 5.5,
   }),
   tractor: profile({
-    displayName: 'Tracteur', massKg: 6000, lengthM: 4.6, widthM: 2.4, heightM: 2.9, wheelbaseM: 2.7, trackWidthM: 1.9,
+    massKg: 6000, lengthM: 4.6, widthM: 2.4, heightM: 2.9, wheelbaseM: 2.7, trackWidthM: 1.9,
     powerKw: 110, topSpeedKmh: 55, firstGearOverall: 40, dragCoefficient: 0.9, frontalAreaM2: 5, drive: 'rwd',
     tireGrip: 1.05, brakeG: 0.6, stiffness: 0.8, cogHeightFraction: 0.5, rpmScale: 0.55, shiftDurationS: 0.45, maxSteeringRad: 0.6, steeringRateRadPerS: 1.0,
     wheelRadiusM: 0.55, suspensionScale: 1.2, maximumReverseSpeedMps: 4,
   }),
   'kart-oobi': profile({
-    displayName: 'Kart', massKg: 180, lengthM: 2.0, widthM: 1.4, heightM: 0.85, wheelbaseM: 1.25, trackWidthM: 1.1,
+    massKg: 180, lengthM: 2.0, widthM: 1.4, heightM: 0.85, wheelbaseM: 1.25, trackWidthM: 1.1,
     powerKw: 11, topSpeedKmh: 85, firstGearOverall: 7, gears: 3, dragCoefficient: 0.8, frontalAreaM2: 0.6, drive: 'rwd',
     tireGrip: 1.35, brakeG: 1.1, stiffness: 1.6, cogHeightFraction: 0.28, rpmScale: 1.1, shiftDurationS: 0.08, maxSteeringRad: 0.62, steeringRateRadPerS: 3,
     wheelRadiusM: 0.14, suspensionScale: 0.4, maximumReverseSpeedMps: 4, tirePeakSlipAngleRad: 0.11, tireSlidingGripRatio: 0.85, tireOptimalTemperatureC: 70, tireLoadSensitivity: 0.04,
@@ -289,7 +289,7 @@ export function vehicleConfigFor(carId: string | null | undefined): VehicleConfi
   if (!carId || !entry) return genericVehicle;
   let config = cache.get(carId);
   if (!config) {
-    config = deriveVehicleConfig(`cardrive-${carId}`, entry);
+    config = deriveVehicleConfig(`cardrive-${carId}`, findCar(carId).label, entry);
     cache.set(carId, config);
   }
   return config;

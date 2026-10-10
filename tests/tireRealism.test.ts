@@ -104,6 +104,40 @@ describe('tire realism with the full vehicle solver', () => {
     world.free();
   });
 
+  it('matches the published performance of the car the prototype is based on (0-100 in ~10.5 s, top speed ~188 km/h)', () => {
+    const config = vehicleConfigFor(null);
+    const { world, body, simulation, speed } = makeRig(config);
+    let zeroTo100 = Number.POSITIVE_INFINITY;
+    let top = 0;
+    for (let step = 0; step < 70 * 60; step += 1) {
+      simulation.step(world, RAPIER, body, { ...neutral, throttle: 1 });
+      world.step();
+      if (zeroTo100 === Number.POSITIVE_INFINITY && speed() >= 100 / 3.6) zeroTo100 = step * dt;
+      top = Math.max(top, speed());
+    }
+    expect(zeroTo100).toBeGreaterThan(9.3);
+    expect(zeroTo100).toBeLessThan(11.2);
+    expect(top * 3.6).toBeGreaterThan(178);
+    expect(top * 3.6).toBeLessThan(198);
+    world.free();
+  });
+
+  it('has no hidden linear damping: coasting from 100 km/h loses speed only to the explicit resistances', () => {
+    const config = vehicleConfigFor(null);
+    expect(config.linearDamping).toBe(0);
+    const { world, body, simulation, speed } = makeRig(config, 27.8);
+    for (let step = 0; step < 5 * 60; step += 1) {
+      // Roues motrices au ralenti, embrayage ouvert : on mesure uniquement roulement + air + frein moteur.
+      simulation.step(world, RAPIER, body, { ...neutral, throttle: 0.02 });
+      world.step();
+    }
+    // Résistances attendues à ~27 m/s : air ≈ 0,5·ρ·CdA·v², roulement ≈ Crr·m·g, frein moteur. Décélération ≈ 0,5-1,6 m/s².
+    const loss = 27.8 - speed();
+    expect(loss).toBeGreaterThan(2.5);
+    expect(loss).toBeLessThan(9);
+    world.free();
+  });
+
   it('stays parked: no creeping or jitter at rest, with the wheels stopped', () => {
     const config = vehicleConfigFor(null);
     const { world, body, simulation, speed } = makeRig(config);

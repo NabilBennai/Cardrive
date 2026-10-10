@@ -50,6 +50,18 @@ function series(title, seconds, every, input, speedMps = 0) {
   world.free();
 }
 
+if (process.env.TOPSPEED) {
+  const { world, body, simulation } = makeRig();
+  for (let step = 0; step < 60 * 120; step += 1) {
+    const telemetry = simulation.step(world, RAPIER, body, { ...neutral, throttle: 1 });
+    world.step();
+    if (step % (60 * 10) === 0) {
+      const v = Math.hypot(body.linvel().x, body.linvel().z);
+      console.log(`t=${(step / 60).toFixed(0).padStart(3)}s v=${(v * 3.6).toFixed(1).padStart(6)} km/h gear=${telemetry.gear} rpm=${telemetry.engineRpm.toFixed(0)} drivenSlip=${simulation.wheelPoses.filter((_, i) => config.wheelMounts[i].driven).map((p) => ((p.omegaRadPerS * config.wheelRadiusM) / Math.max(v, 1) - 1).toFixed(3)).join(' ')}`);
+    }
+  }
+  process.exit(0);
+}
 if (process.env.ACCEL) {
   const { world, body, simulation } = makeRig();
   let t100 = null; let t60 = null;

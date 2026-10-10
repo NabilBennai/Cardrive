@@ -1,6 +1,7 @@
 ﻿import { useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types';
+import { perfStats } from '../../debug/perfStats';
 import { VehicleSimulation, type WheelPose } from './VehicleSimulation';
 
 export type { WheelPose } from './VehicleSimulation';
@@ -37,7 +38,9 @@ export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelP
   useBeforePhysicsStep((world) => {
     const body = bodyRef.current;
     if (!body) return;
+    const solverStart = performance.now();
     const telemetry = simulation.step(world, rapier, body, input.current);
+    perfStats.vehicleSolverMs.push(performance.now() - solverStart);
     telemetryRef.current = telemetry;
     afterStepCallback.current?.(telemetry, body);
     telemetryDelay.current += world.timestep;

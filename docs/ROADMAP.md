@@ -35,21 +35,21 @@ Légende des statuts : ✅ livré · 🟡 partiel · ⬜ à faire.
 | Pneus et transmission | Pacejka en glissement combiné, rotation des roues, différentiel ouvert, inertie moteur, ABS prédictif, thermique à 2 nœuds | ✅ | `tireModel.ts`, `VehicleSimulation.ts`, [step-6-tire-model.md](architecture/step-6-tire-model.md) |
 | Calibration | 12 contrôles automatiques (repos, accélération, freinage, recul, virage, slalom, bosse, collision, respawn, pause), indépendants de la cadence 30/60/120 Hz | ✅ | `scripts/calibrate-vehicle.mjs`, [step-2-calibration.md](architecture/step-2-calibration.md) |
 | Routes réelles | Projection locale, Overpass avec repli sur 3 miroirs, géocodage Nominatim avec autocomplétion, cache IndexedDB (versionné) | ✅ | `src/geo/`, `src/map/` |
-| Streaming | Chunks de 256 m (physique 3×3, rendu 5×5), origine flottante, machine d’états, sol de secours | 🟡 testé hors navigateur, jamais vérifié en conduite réelle | `src/world/streaming/` |
+| Streaming | Chunks de 256 m (physique 3×3, rendu 5×5), origine flottante, machine d’états, sol de secours | ✅ vérifié en navigateur sur ville synthétique (7 frontières, 2 recentrages) ; scintillement au recentrage non mesuré | `src/world/streaming/` |
 | Décor OSM | Bâtiments extrudés avec colliders, trottoirs avec collision (coupés aux carrefours, y compris entre chunks voisins), eau (surfaces, rivières, mur invisible), textures procédurales | ✅ | `src/world/` |
-| Catalogue de voitures | 17 véhicules (prototype + 16 modèles Kenney CC0), garage, mémorisation du choix | ✅ | `src/vehicle/catalog/`, `public/models/cars/` |
+| Catalogue de voitures | 18 véhicules (prototype + 17 modèles Kenney CC0), garage, mémorisation du choix | ✅ | `src/vehicle/catalog/`, `public/models/cars/` |
 | Physique par véhicule | Profil réel (masse, gabarit, puissance, rapports, grip, freins, aéro, direction, transmission) → configuration complète | ✅ | `vehicleProfiles.ts` |
 | Circuits F1 2026 | 24 tracés (piste, vibreurs, murs, ligne de départ), mini-carte hors ligne, sélecteur avec vignettes | ✅ | `src/circuits/` |
 | Interface | Menu, garage, lieux récents, HUD (vitesse, rapport, régime, détails avec `T`), pause, tactile | ✅ | `src/app/`, `src/ui/` |
-| Qualité | 139 tests, 3 scripts de mesure (`calibrate`, `measure-catalog`, `tire-diagnostics`) | ✅ | `tests/`, `scripts/` |
+| Qualité | 157 tests, 12 contrôles de calibration, 7 scénarios de bout en bout, panneau de performance (F3), CI | ✅ | `tests/`, `scripts/`, `src/debug/` |
 
 ### 1.2 Chiffres de référence (prototype, pneus froids)
 
 | Mesure | Valeur | Référence réelle |
 | --- | --- | --- |
-| 0-100 km/h | 10,5 s | 10,5-10,8 s (1.6 VTi 120) |
-| Freinage 100 → 0 | 44 m | ≈ 40-45 m |
-| Vitesse de pointe | 163 km/h | 188 km/h → **écart ouvert** (R-0.1) |
+| 0-100 km/h | 9,9 s | 10,5-10,8 s (1.6 VTi 120) |
+| Freinage 100 → 0 | 45 m | ≈ 40-45 m |
+| Vitesse de pointe | 189 km/h | 188 km/h |
 
 ### 1.3 Limites connues
 
@@ -58,7 +58,7 @@ Légende des statuts : ✅ livré · 🟡 partiel · ⬜ à faire.
 - Aucun son, aucun chronomètre, aucun adversaire, aucune sauvegarde de score.
 - Les modèles Kenney n’ont qu’une texture : pas de repeinture.
 - Une route appartient au chunk de son **premier nœud** (pas de découpage exact aux frontières) ; les trottoirs et l’eau compensent, pas les routes elles-mêmes.
-- Miroirs Overpass publics : `kumi.systems` répond 500 sur les requêtes lourdes (visible en console comme une erreur CORS), `osm.ch` a une couverture partielle et répond vide sans erreur.
+- Les miroirs Overpass publics sont instables et limitent les accès répétés (500, 504, 403 « liste blanche », réponse vide hors Suisse pour `osm.ch`). L'application les contourne (R-0.6) mais ne peut pas garantir un chargement : voir R-7.3.
 - La conduite réelle dans un navigateur de bureau (sensation, FPS) n’a pas été validée sur une machine de référence.
 
 ---
@@ -66,58 +66,67 @@ Légende des statuts : ✅ livré · 🟡 partiel · ⬜ à faire.
 ## 2. Principes de priorisation
 
 1. **Sensation de conduite d’abord** (déjà le principe du dossier d’architecture) : le son, le relief et les surfaces pèsent plus que le décor.
-2. **Mesurer avant d’optimiser** : aucun chiffre de FPS réel n’existe aujourd’hui (R-0.4).
+2. **Mesurer avant d’optimiser** : le panneau F3 et `npm run e2e -- --gpu` existent (R-0.4) ; la marge GPU réelle et les machines d’entrée de gamme restent à mesurer.
 3. **Chaque fonctionnalité apporte son test** : le solveur est déterministe et indépendant de la cadence, ce qui permet des tests de bout en bout dans Rapier headless (`tests/tireRealism.test.ts`). À conserver.
 4. **Pas de dépendance à un service payant ou à un secret côté navigateur** (toutes les variables `VITE_*` sont publiques).
 5. **Licences vérifiées avant intégration** : modèles, sons, tuiles, données d’altitude.
 
 ---
 
-## 3. Phase 0 — Stabiliser et mesurer
+## 3. Phase 0 — Stabiliser et mesurer ✅
 
-Objectif : transformer les « ça a l’air de marcher » en garanties, avant d’empiler des fonctionnalités.
+Terminée le 10 octobre 2026. Bilan par fiche ; le détail des mesures est dans [PERFORMANCE.md](PERFORMANCE.md).
 
-### R-0.1 Vitesse de pointe sous-estimée — S/M ⬜
-- **Constat** : 163 km/h simulés pour 188 annoncés pour la vraie voiture. L’écart se répercute sur tous les profils.
-- **Pistes à vérifier dans cet ordre** : rendement de transmission et inertie en haut régime (`drivetrainEfficiency`, `engineInertiaKgM2`), courbe de couple au-delà de 6 000 tr/min (`torqueCurve`), coefficient de traînée et surface frontale (`aerodynamicDragCoefficient`, `frontalAreaM2`), résistance au roulement à haute vitesse (elle est constante), passage de rapport avant le régime de puissance maximale (`upshiftRpm`).
-- **Méthode** : `tire-diagnostics.mjs` avec une montée en vitesse sur 90 s, bilan de forces à 150 km/h (poussée − traînée − roulement).
-- **Fin** : prototype entre 180 et 190 km/h **sans** dégrader le 0-100 (10,5 ± 0,5 s) ; tableau `measure-catalog` mis à jour ; contrôles de calibration toujours verts.
+| Fiche | Statut | Résultat |
+| --- | --- | --- |
+| R-0.1 Vitesse de pointe | ✅ | 189 km/h (publié : 188). 0-100 en 9,9 s (publié : 10,5-10,8 s) |
+| R-0.2 Vérification visuelle automatisée | ✅ | `npm run e2e` : 7 scénarios, images de référence, console surveillée |
+| R-0.3 Conduite réelle des chunks | 🟡 | Streaming et recentrage validés en navigateur sur une ville synthétique ; une vraie ville validée sur 30 s sans recentrage ; **le scintillement visuel au recentrage n'est pas mesuré** |
+| R-0.4 Budget de performance | ✅ | Panneau F3, budgets, mesures sur la machine de développement ; **machine d'entrée de gamme non mesurée** |
+| R-0.5 Fins de ligne, licences | ✅ | `.gitattributes`, `NOTICE`, `README.md` |
+| R-0.6 Miroirs Overpass | ✅ | Santé des miroirs, nouveaux miroirs ; les services publics restent instables |
+| R-0.7 Cohérence | ✅ | Noms, seuils, tests ajoutés |
+| R-0.8 Déploiement statique | 🟡 | `vercel.json` et CI prêts ; **non déployé** (nécessite un compte) |
 
-### R-0.2 Vérification visuelle automatisée — M ⬜
-- **Pourquoi** : plusieurs défauts n’étaient visibles qu’à l’écran (asphalte invisible par face inversée, textures trop claires, plaques d’herbe par z-fighting, voiture masquée par un nettoyage React).
-- **Approche** : promouvoir le pilote Chrome headless (protocole DevTools, `--use-angle=swiftshader`) en `scripts/e2e/` : ouvrir l’application, parcourir menu → circuit → conduite, enregistrer des captures et la console.
-- **Fin** : une commande `npm run e2e` qui échoue sur toute erreur de console, tout écran vide ou toute différence de capture au-delà d’un seuil, avec captures de référence versionnées pour 3 scénarios (menu, circuit, ville).
-- **Risque** : le rendu logiciel diffère du GPU ; comparer avec tolérance, ne pas viser le pixel exact.
+### R-0.1 Vitesse de pointe ✅
+- **Causes trouvées** (deux, cumulées, et aucune dans le moteur) : l'amortissement linéaire de Rapier (`linearDamping: 0.01`) retirait 1 % de la vitesse par seconde, soit ≈ 530 N à 173 km/h, une résistance fantôme qui doublait presque la traînée de l'air ; la surface frontale (2,69 m²) était le rectangle largeur × hauteur et non la surface réelle d'une voiture (≈ 87 %, soit 2,2 m²).
+- **Effet de bord corrigé** : retirer la résistance fantôme a fait dépasser leur cible à tous les véhicules du catalogue (berline sport à 307 km/h pour 270 visés). La vitesse visée est maintenant fixée par la démultiplication du dernier rapport (`REDLINE_OVER_TOP_SPEED` dans `vehicleProfiles.ts`) : le catalogue retombe sur ses cibles (berline 214 pour 215, pompiers 115 pour 115, tracteur 55 pour 55).
+- **Garde-fous** : tests `tireRealism` sur le 0-100, la vitesse de pointe et l'absence d'amortissement linéaire caché.
+- **Reste** : le 0-100 simulé est 6 à 9 % plus rapide que le chiffre publié.
 
-### R-0.3 Conduite réelle des chunks (étape 4) — M ⬜
-- **Constat** : le streaming et l’origine flottante n’ont jamais été vérifiés en conduite longue ; un scintillement au recentrage est signalé comme possible (`useFloatingOrigin.ts`).
-- **Approche** : scénario scripté traversant plusieurs frontières de chunks à 50-120 km/h dans 3 villes (dense, périphérie, rural), journalisation des recentrages, des chunks chargés/évincés, des temps de génération et des trous visuels.
-- **Fin** : aucune chute dans le vide, aucun saut de caméra visible, budget de génération documenté (ms par chunk), comportement contrôlé quand un chunk tarde.
+### R-0.2 Vérification visuelle automatisée ✅
+- **Contenu** (`scripts/e2e/`, `npm run e2e`) : menu, garage (18 véhicules, caractéristiques), catalogue de circuits (24), conduite à Monaco, pause et reprise, choix d'un camion et conduite à Singapour, ville synthétique. Échoue sur toute erreur de console, tout écran uniforme, toute régression visuelle des écrans d'interface au-delà de 0,4 % de pixels, tout dépassement grossier du budget physique.
+- **Pilote** : Chrome sans interface par le protocole DevTools, sans dépendance. Rendu logiciel (SwiftShader) par défaut pour la reproductibilité, `--gpu` pour des mesures représentatives.
+- **Ce qu'il a trouvé au premier passage** : un `favicon.ico` absent (erreur 404 en console, en production aussi).
+- **Limites** : les scènes 3D ne sont pas comparées pixel à pixel (non déterministes) ; elles sont validées par des assertions (accélération, rendu non uniforme, compteurs). Les images de référence dépendent de la police du système : `npm run e2e:update` sur une autre machine.
 
-### R-0.4 Machine de référence et budget de performance — M ⬜
-- **Constat** : « 60 FPS sur la machine de référence » est un objectif du dossier, mais ni la machine ni les mesures n’existent.
-- **Approche** : définir une machine de référence ; instrumenter temps de physique par pas, temps de rendu, nombre de colliders et de triangles, mémoire GPU ; afficher un panneau de debug (touche dédiée) ; documenter les budgets.
-- **Fin** : tableau « scène × qualité × FPS » dans `docs/`, alerte si le budget physique par pas dépasse 4 ms.
-- **Dépend de** : R-0.2 pour automatiser.
+### R-0.3 Conduite réelle des chunks 🟡
+- **Fait** : compteurs ajoutés au panneau F3 (chunks actifs, en échec, frontières franchies, recentrages, durée de génération). Scénario **déterministe et hors ligne** : une ville synthétique de 5 km servie à la place d'Overpass et de Nominatim (interception réseau) ; 45 s de conduite à 185 km/h franchissent 7 frontières de chunk et déclenchent 2 recentrages d'origine flottante, sans chunk en échec ni erreur de console, génération de chunk ≤ 0,3 ms. Test unitaire de couverture le long d'une route de 4 km (`tests/streamingCoverage.test.ts`).
+- **Vraie ville** (`--network`) : Paris, 30 puis 75 s, voiture à 162 km/h maximum ; 0 chunk en échec ; **le seuil de recentrage n'a pas été atteint** et le nombre de frontières franchies n'était pas encore compté à ce moment (cause non établie : arrêt contre un obstacle probable, la rue n'étant pas droite). Les services Overpass ayant ensuite refusé les requêtes répétées, ce scénario n'a pas pu être refait avec les compteurs.
+- **Reste** : mesurer le scintillement visuel à l'instant du recentrage (comparaison d'images consécutives autour de l'événement) ; quartier très dense ; limite connue R-4.6 (une voie plus longue que le rayon de rendu disparaît derrière le véhicule, codée comme échec attendu dans les tests).
 
-### R-0.5 Fins de ligne et hygiène du dépôt — S ⬜
-- Des avertissements LF/CRLF apparaissent à chaque commit. Ajouter un `.gitattributes` (`* text=auto eol=lf`) et normaliser en un commit isolé.
-- Garder `kenney_car-kit/` dans `.gitignore` (déjà fait) ; documenter l’origine de `public/models/cars/` et la licence dans un `NOTICE`.
+### R-0.4 Budget de performance ✅
+- Panneau F3 : images/s, p95, pas physique, solveur véhicule, triangles, appels de rendu, colliders, mémoire, chunks. Budgets et tests (`tests/perfStats.test.ts`). Machine de référence : i5-13400F / RTX 4070.
+- **Résultat** : physique + solveur ≈ 2 % du budget d'une image ; génération d'un chunk ≈ 0,2 ms.
+- **Reste, important** : le mode headless plafonne à ≈ 100 images/s, la marge GPU réelle n'est pas connue ; aucune mesure sur machine d'entrée de gamme.
 
-### R-0.6 Sélection des miroirs Overpass — S/M ⬜
-- **Constat** : un miroir en 500 pollue la console et coûte un aller-retour ; un autre répond vide à tort.
-- **Approche** : mémoriser la santé des miroirs (échecs récents, réponses vides suspectes) pour la session et les essayer dans l’ordre de fiabilité observée ; limiter la requête d’eau (la plus lourde) à une emprise plus petite ou la filtrer côté serveur (`out geom` seulement pour les grandes surfaces).
-- **Fin** : pas plus d’une requête en échec par chargement dans le cas courant ; test sur fixtures de réponses simulées (500, vide, JSON invalide).
+### R-0.5 Fins de ligne et hygiène du dépôt ✅
+`.gitattributes` (LF partout), `NOTICE` (OpenStreetMap, tracés `bacinger/f1-circuits`, Kenney Car Kit), `README.md` (commandes, organisation, documentation).
 
-### R-0.7 Petits écarts de cohérence — S ⬜
-- Libellés du catalogue (`Course`) différents du nom du profil (`Voiture de course`) : une seule source.
-- Seuils de couleur des températures dans le HUD (`cold < 55 °C` alors que l’optimum est 80 °C et l’ambiant 20 °C : tout est « froid » au départ) : dériver les seuils de la configuration.
-- `engineBrakeTorqueNm` appliqué avec `(1 − gaz)` : vérifier que ce n’est pas un doublon des pertes déjà contenues dans la courbe de couple à charge partielle.
-- Aucun test pour `splitWaterByChunk` ni pour le découpage de trottoirs inter-chunks sur un jeu de chunks complet.
+### R-0.6 Sélection des miroirs Overpass ✅
+- `MirrorHealth` : un miroir en échec est repoussé en fin de liste pour 30 s, 1, 2 puis 5 min au plus ; une réponse vide suspecte compte pour moitié ; aucun miroir n'est jamais exclu. Partagé entre le chargement initial et le streaming. Testé sans réseau.
+- Miroirs réévalués : `overpass.openstreetmap.fr` et `overpass.private.coffee` répondent vite (< 1 s) et autorisent le navigateur (CORS) aux premières requêtes, mais le premier bascule sur « usages sur liste blanche » (403) et le second sur 500 dès que les requêtes se répètent. **Aucun miroir public ne tient la charge d'un test automatisé** : c'est pourquoi la ville de l'e2e est simulée.
+- **Reste** : un vrai correctif durable demande un cache plus agressif (zones déjà vues), voire un service dédié (voir R-7.3 pour la contrainte d'architecture).
 
-### R-0.8 Déploiement statique — S/M ⬜
-- Critère de l’étape 7 du dossier : build `npm run build` servi par Vercel, sans backend. Vérifier les chemins `BASE_URL` des modèles (`public/models/cars`), le cache HTTP des GLB, la taille du bundle (avertissement > 500 kB déjà présent : découpage par route, import dynamique de `three/examples` et des circuits).
-- **Fin** : URL publique, aucune erreur de console, temps de chargement initial mesuré.
+### R-0.7 Petits écarts de cohérence ✅
+- Nom d'un véhicule : source unique, le catalogue. Seuils « froid / chaud » du HUD : dérivés de la température optimale du véhicule. Frein moteur : vérifié, ce n'est **pas** un doublon (couple net = gaz × couple moteur − (1 − gaz) × frein moteur, la forme standard).
+- Tests ajoutés : eau répartie entre chunks, trottoirs coupés par une route du chunk voisin.
+- Erreur de comptage corrigée : le catalogue compte **18** entrées (le prototype et 17 modèles), pas 17.
+
+### R-0.8 Déploiement statique 🟡
+- `vercel.json` (build, `dist`, cache immuable des fichiers hachés, cache d'une semaine des modèles, en-têtes de sécurité) et `.github/workflows/ci.yml` (lint, typecheck, tests, build). Un favicon a été ajouté.
+- **Reste** : le déploiement lui-même (compte Vercel), la vérification de l'URL publique et du temps de chargement réel. La CI n'a pas encore tourné sur GitHub.
+- Bundle : 283 ko au démarrage ; le moteur 3D et physique (3,26 Mo, 1,12 Mo compressé) se charge au lancement d'une partie. Le découpage en fichiers de bibliothèques a été essayé et abandonné (aucun gain).
 
 ---
 
@@ -323,7 +332,7 @@ Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout :
 
 | Jalon | Contenu | Résultat attendu |
 | --- | --- | --- |
-| **M1 — Fiable** | R-0.1, R-0.2, R-0.4, R-0.5, R-0.7, R-0.8 | Un jeu mesuré, déployé, dont les régressions visuelles sont détectées |
+| **M1 — Fiable** ✅ | R-0.1 à R-0.8 (R-0.3 et R-0.8 partiels) | Un jeu mesuré, dont les régressions sont détectées ; reste à déployer |
 | **M2 — Vivant** | R-1.1 à R-1.4, R-6.3, R-3.1 | Moteur, pneus, impacts, particules, caméras, surfaces : la conduite « se sent » |
 | **M3 — Compétitif** | R-2.1 à R-2.3, R-2.5, R-2.6, R-6.5 | Chrono, records, fantôme, départ, classement, nouveaux modes |
 | **M4 — Adversaires** | R-3.3, R-2.4, R-3.8, R-6.1 | IA, aides réglables, boîte manuelle, manette |
