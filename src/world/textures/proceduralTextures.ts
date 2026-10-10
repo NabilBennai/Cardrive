@@ -1,4 +1,4 @@
-import { CanvasTexture, RepeatWrapping, type Texture } from 'three';
+import { CanvasTexture, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
 
 const TWO_PI = Math.PI * 2;
 const NOISE_TERMS = 4;
@@ -44,8 +44,14 @@ function paintSpeckle(context: CanvasRenderingContext2D, size: number, seed: num
   context.globalAlpha = 1;
 }
 
-function finalizeTexture(canvas: HTMLCanvasElement): CanvasTexture {
+/**
+ * `srgb` : les couleurs du canvas sont des couleurs d'écran (sRGB) et doivent être décodées comme
+ * telles. Les textures historiques (routes, bâtiments) ne le font pas — elles s'affichent plus
+ * claires — et sont laissées ainsi pour ne pas changer leur rendu ; les textures de circuit, elles, l'activent.
+ */
+function finalizeTexture(canvas: HTMLCanvasElement, srgb = false): CanvasTexture {
   const texture = new CanvasTexture(canvas);
+  if (srgb) texture.colorSpace = SRGBColorSpace;
   texture.wrapS = RepeatWrapping;
   texture.wrapT = RepeatWrapping;
   texture.needsUpdate = true;
@@ -53,6 +59,9 @@ function finalizeTexture(canvas: HTMLCanvasElement): CanvasTexture {
 }
 
 let asphaltTexture: CanvasTexture | null = null;
+let circuitAsphaltTexture: CanvasTexture | null = null;
+let kerbTexture: CanvasTexture | null = null;
+let circuitGroundTexture: CanvasTexture | null = null;
 let groundTexture: CanvasTexture | null = null;
 let facadeTexture: CanvasTexture | null = null;
 
@@ -99,4 +108,43 @@ export function createFacadeTexture(): Texture {
   paintSpeckle(context, size, 31, 70, 1.2, '#b5af9c', 0.3);
   facadeTexture = finalizeTexture(canvas);
   return facadeTexture;
+}
+
+/** Asphalte de circuit : même grain que createAsphaltTexture mais sans ligne centrale (une piste de course n'en a pas). Singleton partagé. */
+export function createCircuitAsphaltTexture(): Texture {
+  if (circuitAsphaltTexture) return circuitAsphaltTexture;
+  const size = 256;
+  const { canvas, context } = createCanvas(size);
+  context.fillStyle = '#34373a';
+  context.fillRect(0, 0, size, size);
+  paintSpeckle(context, size, 11, 110, 1.4, '#43474a', 0.4);
+  paintSpeckle(context, size, 23, 80, 1.1, '#26292b', 0.35);
+  circuitAsphaltTexture = finalizeTexture(canvas, true);
+  return circuitAsphaltTexture;
+}
+
+/** Vibreur : moitié rouge, moitié blanche dans le sens de la longueur ; se répète le long du bord de piste. Singleton partagé. */
+export function createKerbTexture(): Texture {
+  if (kerbTexture) return kerbTexture;
+  const size = 64;
+  const { canvas, context } = createCanvas(size);
+  context.fillStyle = '#d83a2e';
+  context.fillRect(0, 0, size, size / 2);
+  context.fillStyle = '#f1f1ec';
+  context.fillRect(0, size / 2, size, size / 2);
+  kerbTexture = finalizeTexture(canvas, true);
+  return kerbTexture;
+}
+
+/** Herbe de circuit (sRGB) : même motif que createGroundTexture, mais décodée correctement. Singleton partagé. */
+export function createCircuitGroundTexture(): Texture {
+  if (circuitGroundTexture) return circuitGroundTexture;
+  const size = 256;
+  const { canvas, context } = createCanvas(size);
+  context.fillStyle = '#3f5a33';
+  context.fillRect(0, 0, size, size);
+  paintSpeckle(context, size, 7, 140, 2.6, '#4d6c3e', 0.5);
+  paintSpeckle(context, size, 19, 100, 2.1, '#33492a', 0.4);
+  circuitGroundTexture = finalizeTexture(canvas, true);
+  return circuitGroundTexture;
 }

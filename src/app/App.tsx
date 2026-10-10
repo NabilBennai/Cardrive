@@ -8,6 +8,9 @@ import { DrivingHUD } from '../ui/DrivingHUD';
 import { TouchControls } from '../ui/TouchControls';
 import { LocationPicker } from './LocationPicker';
 import { CarPicker } from './CarPicker';
+import { CircuitPicker } from './CircuitPicker';
+import { buildCircuitTrack, type CircuitTrack } from '../circuits/circuitGeometry';
+import type { CircuitSource } from '../circuits/f1Circuits2026';
 import { carModelUrl, findCar, loadSelectedCarId, saveSelectedCarId } from '../vehicle/catalog/carCatalog';
 import { GeoLoadingScreen, type GeoLoadingScreenState } from './GeoLoadingScreen';
 import { GeoLoadError, loadRoadWorld, type LoadedRoadWorld } from './geoOrchestrator';
@@ -72,6 +75,8 @@ export function App() {
   // Étape 3 : choix du lieu, chargement OSM/Overpass, piste de démo toujours disponible hors ligne.
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [showCarPicker, setShowCarPicker] = useState(false);
+  const [showCircuitPicker, setShowCircuitPicker] = useState(false);
+  const [circuitTrack, setCircuitTrack] = useState<CircuitTrack | null>(null);
   const [selectedCarId, setSelectedCarId] = useState(loadSelectedCarId);
   const selectedCar = findCar(selectedCarId);
   const chooseCar = useCallback((id: string) => { setSelectedCarId(id); saveSelectedCarId(id); }, []);
@@ -93,6 +98,7 @@ export function App() {
     const controller = new AbortController();
     geoAbortRef.current = controller;
     setLastPlace(place);
+    setCircuitTrack(null);
     setRenderAnchor(null);
     setZoneUnavailable(false);
     setGeoScreen({ kind: 'loading' });
@@ -114,11 +120,26 @@ export function App() {
 
   const startDemoTrack = useCallback(() => {
     geoAbortRef.current?.abort();
+    setCircuitTrack(null);
     setUseDemoTrack(true);
     setRenderAnchor(null);
     setZoneUnavailable(false);
     setGeoScreen(null);
     setShowLocationPicker(false);
+    setPlaying(true);
+    setPaused(false);
+    requestAnimationFrame(() => gameFocus.current?.focus());
+  }, []);
+  const startCircuit = useCallback((source: CircuitSource) => {
+    geoAbortRef.current?.abort();
+    const track = buildCircuitTrack(source);
+    setCircuitTrack(track);
+    setLastPlace(track.anchor);
+    setUseDemoTrack(false);
+    setRenderAnchor(null);
+    setZoneUnavailable(false);
+    setGeoScreen(null);
+    setShowCircuitPicker(false);
     setPlaying(true);
     setPaused(false);
     requestAnimationFrame(() => gameFocus.current?.focus());
@@ -145,10 +166,12 @@ export function App() {
 
   const physicsPaused = useMemo(() => !playing || paused || tabHidden, [playing, paused, tabHidden]);
   const drivingWorld: DrivingWorld = useMemo(
-    () => (!useDemoTrack && roadWorld
+    () => (circuitTrack
+      ? { kind: 'circuit', track: circuitTrack }
+      : !useDemoTrack && roadWorld
       ? { kind: 'roads', worldAnchor: roadWorld.worldAnchor, initialChunks: roadWorld.initialChunks, spawnPose: roadWorld.spawnPose }
       : { kind: 'demo' }),
-    [useDemoTrack, roadWorld],
+    [useDemoTrack, roadWorld, circuitTrack],
   );
 
   return (
@@ -180,11 +203,15 @@ export function App() {
         </SceneErrorBoundary>
       )}
 
+      {!playing && showCircuitPicker && (
+        <CircuitPicker onChoose={startCircuit} onBack={() => setShowCircuitPicker(false)} />
+      )}
+
       {!playing && showCarPicker && (
         <CarPicker selectedId={selectedCarId} onSelect={chooseCar} onBack={() => setShowCarPicker(false)} />
       )}
 
-      {!playing && showLocationPicker && !geoScreen && !showCarPicker && (
+      {!playing && showLocationPicker && !geoScreen && !showCarPicker && !showCircuitPicker && (
         <LocationPicker
           onChoosePlace={requestRoadWorld}
           onUseDemoTrack={startDemoTrack}
@@ -200,7 +227,7 @@ export function App() {
         />
       )}
 
-      {!playing && !showLocationPicker && !geoScreen && !showCarPicker && (
+      {!playing && !showLocationPicker && !geoScreen && !showCarPicker && !showCircuitPicker && (
         <section className="screen" aria-label="Menu principal">
           <div className="brand"><span className="brand-mark">C</span>Cardrive</div>
           <div className="screen-body">
@@ -212,6 +239,9 @@ export function App() {
               </button>
               <button className="menu-row" onClick={() => setShowLocationPicker(true)}>
                 <div><strong>Lieu réel</strong><span>Rouler dans une vraie ville (bêta)</span></div><i>›</i>
+              </button>
+              <button className="menu-row" onClick={() => setShowCircuitPicker(true)}>
+                <div><strong>Circuits F1 2026</strong><span>Les 24 tracés du calendrier</span></div><i>›</i>
               </button>
               <button className="menu-row" onClick={() => setShowCarPicker(true)}>
                 <div><strong>Garage</strong><span>{selectedCar.label}</span></div><i>›</i>

@@ -4,6 +4,8 @@ import { Suspense, useEffect } from 'react';
 import type { GeoAnchor } from '../geo/projection';
 import type { VehicleInput, VehicleTelemetry } from '../shared/types';
 import { ChaseCamera } from '../camera/ChaseCamera';
+import { CircuitScene } from '../circuits/CircuitScene';
+import type { CircuitTrack } from '../circuits/circuitGeometry';
 import { GenericCar } from '../vehicle/rendering/GenericCar';
 import { DemoTrack } from '../world/terrain/DemoTrack';
 import { StreamingRoadNetwork } from '../world/streaming/StreamingRoadNetwork';
@@ -14,7 +16,8 @@ import { headingToQuaternion, VEHICLE_FIXED_STEP_S } from '../vehicle/physics/ve
 
 export type DrivingWorld =
   | { kind: 'demo' }
-  | { kind: 'roads'; worldAnchor: GeoAnchor; initialChunks: StreamedChunk[]; spawnPose: RoadSpawnPose };
+  | { kind: 'roads'; worldAnchor: GeoAnchor; initialChunks: StreamedChunk[]; spawnPose: RoadSpawnPose }
+  | { kind: 'circuit'; track: CircuitTrack };
 
 interface DrivingSceneProps {
   input: React.RefObject<VehicleInput>;
@@ -36,7 +39,9 @@ export function DrivingScene({
 }: DrivingSceneProps) {
   const spawnPose = world.kind === 'roads'
     ? { position: { x: world.spawnPose.position.xM, y: 0.8, z: world.spawnPose.position.zM }, rotation: headingToQuaternion(world.spawnPose.headingRad) }
-    : undefined;
+    : world.kind === 'circuit'
+      ? { position: { x: world.track.spawn.xM, y: 0.8, z: world.track.spawn.zM }, rotation: headingToQuaternion(world.track.spawn.headingRad) }
+      : undefined;
   // Toujours appelé (règle des Hooks) ; sans effet pour la démo (worldAnchor fictive, jamais lue).
   const floatingOrigin = useFloatingOrigin(world.kind === 'roads' ? world.worldAnchor : { latitudeDeg: 0, longitudeDeg: 0 });
 
@@ -64,6 +69,8 @@ export function DrivingScene({
         <Suspense fallback={null}>
           {world.kind === 'demo' ? (
             <DemoTrack />
+          ) : world.kind === 'circuit' ? (
+            <CircuitScene track={world.track} />
           ) : (
             <StreamingRoadNetwork
               worldAnchor={world.worldAnchor}
