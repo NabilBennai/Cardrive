@@ -19,7 +19,7 @@ Commandes : `ZQSD` ou les flèches pour conduire, `Espace` frein à main, `R` re
 | --- | --- |
 | `npm run lint` · `npm run typecheck` · `npm test` | Contrôles statiques et tests unitaires / de physique (Rapier sans interface) |
 | `npm run build` | Build de production (`dist/`) |
-| `npm run e2e` | Tests de bout en bout dans Chrome sans interface : menu, garage, circuits, conduite, pause, ville synthétique (streaming, recentrage), régressions visuelles des écrans d'interface. Options : `--gpu` (rendu matériel, seul mode où les FPS sont représentatifs), `--network` (ajoute une vraie ville, via Overpass), `--only=texte`, `--drive=secondes` |
+| `npm run e2e` | Tests de bout en bout dans Chrome sans interface : menu, garage, circuits, conduite, pause, ville synthétique (streaming, recentrage), collision contre un mur après deux recentrages, régressions visuelles des écrans d'interface. Options : `--gpu` (rendu matériel, seul mode où les FPS sont représentatifs), `--network` (ajoute une vraie ville, via Overpass), `--only=texte`, `--drive=secondes` |
 | `npm run e2e:update` | Régénère les images de référence de `scripts/e2e/baseline/` |
 | `npm run calibrate` | 12 contrôles de comportement du véhicule à 30, 60 et 120 Hz ; régénère `docs/architecture/calibration-results.json` |
 | `npm run measure-catalog` | 0-100 km/h, vitesse de pointe et freinage de chacun des 18 véhicules |

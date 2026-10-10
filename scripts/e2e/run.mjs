@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launchPage, sleep } from './cdp.mjs';
-import { answerNominatim, answerOverpass } from './syntheticCity.mjs';
+import { answerNominatim, answerOverpass, OBSTACLE, setObstacle } from './syntheticCity.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -214,7 +214,8 @@ async function cityScenario(live) {
         const build = await page.eval("document.querySelector('[data-perf=\"chunk-build\"]')?.textContent ?? ''");
         const [active, failed, crossings, recenters] = chunks.replace(/[\s\u202f\u00a0]/g, '').split('·').map(Number);
         const maxBuild = Number.parseFloat((build.split('·')[1] ?? '0').replace(',', '.'));
-        return { active, failed, crossings, recenters, maxBuild };
+        const [recenterJump, steadyJump] = (await page.eval("document.querySelector('[data-perf=\"jump\"]')?.textContent ?? ''")).replace(',', '.').match(/[\d.]+/g)?.map(Number) ?? [0, 0];
+        return { active, failed, crossings, recenters, maxBuild, recenterJump, steadyJump };
       };
       const before = await readWorld();
       const startedAt = Date.now();
@@ -226,6 +227,8 @@ async function cityScenario(live) {
         topSpeed = Math.max(topSpeed, Number(await page.eval("document.querySelector('.speed b')?.textContent ?? '0'")));
         if (await page.eval("Boolean(document.querySelector('.toast'))")) unavailable = true;
       }
+      // Capture en fin de conduite, voiture encore loin de l'origine : permet de vérifier à l'œil que l'éclairage et les ombres suivent la voiture.
+      writeFileSync(join(outputDir, `${label}-fin.png`), await page.screenshot());
       await page.key('keyUp', 'KeyW', 'w');
       await sleep(600);
       const after = await readWorld();
@@ -238,11 +241,12 @@ async function cityScenario(live) {
       if (!live) {
         if (topSpeed < 100) throw new Error(`Sur une avenue droite la voiture aurait dû dépasser 100 km/h (max ${topSpeed} km/h) : elle s'est arrêtée (chunk manquant, collision ?).`);
         if (crossed < 3) throw new Error(`Au moins 3 frontières de chunk attendues, ${crossed} franchies.`);
+        if (after.recenterJump > 5) throw new Error(`Discontinuité visuelle au recentrage : le vecteur voiture→caméra saute de ${after.recenterJump} m entre deux images (conduite normale : ${after.steadyJump} m).`);
         if (recentered < 1) throw new Error(`Aucun recentrage de l'origine flottante (seuil 1 km) malgré ${crossed} frontières franchies.`);
         if (after.failed > 0) throw new Error(`${after.failed} chunk(s) en échec alors que le service est local.`);
         if (unavailable) throw new Error('Le bandeau « zone suivante indisponible » est apparu.');
       }
-      return `${detail}\n    conduite ${DRIVE_MS / 1000} s : vitesse max ${topSpeed} km/h · chunks actifs ${before.active} → ${after.active} · en échec ${after.failed} · frontières de chunk franchies ${crossed} · recentrages ${recentered} · génération max ${after.maxBuild} ms${unavailable ? ' · AVERTISSEMENT « zone indisponible » affiché' : ''}`;
+      return `${detail}\n    conduite ${DRIVE_MS / 1000} s : vitesse max ${topSpeed} km/h · chunks actifs ${before.active} → ${after.active} · en échec ${after.failed} · frontières de chunk franchies ${crossed} · recentrages ${recentered} · génération max ${after.maxBuild} ms · saut caméra au recentrage ${after.recenterJump} m (conduite normale : ${after.steadyJump} m)${unavailable ? ' · AVERTISSEMENT « zone indisponible » affiché' : ''}`;
     } finally {
       page.mock = null;
     }
@@ -329,6 +333,61 @@ try {
   });
 
   await cityScenario(false);
+  await scenario('Collision contre un mur à 2,5 km, après deux recentrages (colliders des chunks)', async () => {
+    page.mock = syntheticServices;
+    setObstacle(true);
+    try {
+      await home(page);
+      // Le cache IndexedDB d'un scénario précédent contiendrait des chunks sans le mur : on le vide avant de lancer la partie.
+      await page.eval("new Promise((resolve) => { const request = indexedDB.deleteDatabase('cardrive-geo-cache'); request.onsuccess = request.onerror = request.onblocked = () => resolve(true); })");
+      await page.eval("localStorage.setItem('cardrive.selectedCar', 'prototype')");
+      await home(page);
+      await page.click('Lieu réel');
+      await page.waitFor("document.querySelector('input[type=search]')", 'le champ de recherche');
+      await page.eval("(() => { const input = document.querySelector('input[type=search]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(input, 'Avenue de test'); input.dispatchEvent(new Event('input', { bubbles: true })); })()");
+      await page.waitFor("document.querySelector('.option')", "une suggestion d'adresse", 30_000);
+      await page.eval("document.querySelector('.option').click()");
+      await page.waitFor("document.querySelector('.hud-layer')", 'le tableau de bord', 90_000);
+      await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement', 90_000);
+      await page.tap('F3', 'F3');
+      await page.waitFor("document.querySelector('[data-perf-overlay]')", 'le panneau de performance');
+      const read = async (id) => Number.parseFloat((await page.eval(`document.querySelector('[data-perf="${id}"]')?.textContent ?? '0'`)).replace(/[\s\u202f\u00a0]/g, '').replace(',', '.'));
+      await page.key('keyDown', 'KeyW', 'w');
+      const startedAt = Date.now();
+      let reachedSpeed = 0;
+      let stoppedAtX = null;
+      let recenters = 0;
+      while (Date.now() - startedAt < 90_000) {
+        await sleep(300);
+        const speed = Number(await page.eval("document.querySelector('.speed b')?.textContent ?? '0'"));
+        reachedSpeed = Math.max(reachedSpeed, speed);
+        const x = await read('world-x');
+        if (reachedSpeed > 100 && speed < 15) { stoppedAtX = x; break; }
+        if (x > OBSTACLE.x + 400) break; // dépassé le mur sans s'arrêter
+      }
+      // La position affichée est rafraîchie toutes les 0,4 s : on attend qu'elle rattrape la voiture arrêtée contre le mur.
+      await sleep(1_500);
+      const restX = await read('world-x');
+      await page.key('keyUp', 'KeyW', 'w');
+      const chunks = (await page.eval("document.querySelector('[data-perf=\"chunks\"]')?.textContent ?? ''")).replace(/[\s\u202f\u00a0]/g, '').split('·').map(Number);
+      recenters = chunks[3];
+      await page.tap('F3', 'F3');
+      assertNoProblems(page, 'collision');
+      if (stoppedAtX === null) throw new Error(`La voiture n'a pas été arrêtée par le mur à x = ${OBSTACLE.x} m (vitesse max ${reachedSpeed} km/h) : les colliders des bâtiments ne suivent pas le recentrage.`);
+      const requiredRecenters = OBSTACLE.x >= 2_000 ? 2 : 0; // E2E_WALL_X=600 : témoin sans recentrage
+      if (recenters < requiredRecenters) throw new Error(`Seulement ${recenters} recentrage(s) avant le mur : le test ne couvre pas le cas visé (${requiredRecenters} requis).`);
+      // L'avant de la voiture (2 m devant son centre) touche le mur à x = 2500 : le centre du châssis atteint ≈ 2498 au plus.
+      // Des colliders restés dans l'ancien repère décaleraient l'impact de ≈ 1 000 m par recentrage, pas de quelques mètres.
+      if (process.env.E2E_WALL_PROBE) return `SONDE : repos à x = ${restX.toFixed(1)} m (mur à ${OBSTACLE.x} m, écart ${(restX - OBSTACLE.x).toFixed(1)} m) après ${recenters} recentrages`;
+      // Contre le mur : le centre du châssis est à ≈ 2,2 m devant lui (demi-longueur 1,93 m + débattement), au plus quelques mètres de rebond.
+      // Des colliders restés dans l'ancien repère décaleraient cet arrêt de ≈ 1 000 m par recentrage, pas de quelques mètres.
+      if (restX < OBSTACLE.x - 8 || restX > OBSTACLE.x) throw new Error(`Arrêt à x = ${restX.toFixed(0)} m au lieu d'environ ${(OBSTACLE.x - 2.5).toFixed(0)} m : colliders décalés (${recenters} recentrages).`);
+      return `arrêt contre le mur à x = ${restX.toFixed(0)} m (mur à ${OBSTACLE.x} m) après ${recenters} recentrages, ${reachedSpeed} km/h atteints`;
+    } finally {
+      setObstacle(false);
+      page.mock = null;
+    }
+  });
   if (NETWORK) await cityScenario(true);
 } finally {
   await page.close();

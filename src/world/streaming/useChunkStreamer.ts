@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { unprojectFromLocal, type GeoAnchor } from '../../geo/projection.ts';
+import { projectToLocal, unprojectFromLocal, type GeoAnchor } from '../../geo/projection.ts';
 import { openGeoCache, readGeoCache, writeGeoCache } from '../../map/geoCache.ts';
 import type { RawOsmData } from '../../map/geoProvider.ts';
 import { perfStats } from '../../debug/perfStats.ts';
@@ -122,6 +122,7 @@ export function useChunkStreamer(
     const telemetry = telemetryRef.current;
     if (!telemetry) return;
     const geoPoint = unprojectFromLocal({ xM: telemetry.positionM.xM, yM: 0, zM: telemetry.positionM.zM }, renderAnchor);
+    perfStats.world.vehicleWorldXM = projectToLocal(geoPoint, worldAnchor).xM;
     const vehicleKey = chunkKeyForGeoPoint(geoPoint, worldAnchor);
     const renderKeys = neighborhood(vehicleKey, RENDER_RADIUS_CHUNKS);
     const vehicleKeyString = chunkKeyToString(vehicleKey);

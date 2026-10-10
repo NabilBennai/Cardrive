@@ -20,6 +20,8 @@ Budgets, instrumentation et mesures de référence. Les chiffres sont des **mesu
 | Solveur véhicule | Durée du solveur (pneus, suspension, transmission) par pas | ≤ 1 ms |
 | Triangles · appels de rendu | `gl.info.render` (dernière image) | ≤ 1,5 M · ≤ 400 |
 | Colliders · corps · géométries · textures | `world.colliders.len()`, `gl.info.memory` | information |
+| Saut caméra : recentrage · normal | Variation du vecteur voiture→caméra rendu, sur les 8 images suivant un recentrage / en conduite normale | recentrage ≲ normal (l'e2e échoue au-delà de 5 m) |
+| Position monde (est) | Position du véhicule dans le repère du lieu, indépendante des recentrages | information |
 | Chunks actifs · en échec · franchis · recentrages | `useChunkStreamer`, `useFloatingOrigin` | 0 en échec ; ≥ 9 actifs |
 | Génération de chunk moy. · max | Construction des graphes de routes, bâtiments, eau | max ≤ 25 ms |
 | Mémoire JS | `performance.memory` (Chrome uniquement) | information |
@@ -41,12 +43,12 @@ C'est une machine **haut de gamme**. Elle sert à détecter les régressions, pa
 
 | Scène | Triangles | Images/s | Pas physique moy. | Solveur véhicule |
 | --- | --- | --- | --- | --- |
-| Circuit de Monaco | 41 558 | ≈ 100 | 0,11 ms | 0,21 ms |
-| Circuit de Singapour, camion | 53 542 | ≈ 100 | 0,12 ms | 0,22 ms |
-| Ville synthétique (avenue de 5 km) | 11 906 | ≈ 100 | 0,11 ms | 0,20 ms |
+| Circuit de Monaco | 41 558 | ≈ 100 | 0,08 ms | 0,17 ms |
+| Circuit de Singapour, camion | 53 542 | ≈ 100 | 0,10 ms | 0,21 ms |
+| Ville synthétique (avenue de 5 km, immeubles, trottoirs) | 21 240 | ≈ 100 | 0,09 ms | 0,19 ms |
 | Paris, rue de Rivoli (réseau réel) | 54 212 | ≈ 99 | 0,08 ms | 0,14 ms |
 
-Streaming, ville synthétique, 45 s de conduite à 185 km/h : **7 frontières de chunk franchies, 2 recentrages d'origine flottante, 0 chunk en échec**, génération maximale d'un chunk **0,2 à 0,3 ms** (budget 25 ms), 25 chunks actifs.
+Streaming, ville synthétique, 45 s de conduite à 185 km/h : **7 frontières de chunk franchies, 2 recentrages d'origine flottante, 0 chunk en échec**, génération maximale d'un chunk **0,2 à 0,3 ms** (budget 25 ms), 25 chunks actifs. **Continuité visuelle au recentrage : saut du vecteur voiture→caméra de 0,5 à 0,6 m**, contre 0,5 à 0,7 m en conduite normale (avant correction : 351 à 915 m). Le panneau F3 affiche ces deux valeurs.
 
 Le budget physique est très largement respecté : le pas physique complet (Rapier + solveur de véhicule) représente **≈ 2 % du budget d'une image à 60 FPS**, et le solveur de véhicule seul **≈ 1 %**.
 
@@ -60,7 +62,7 @@ Le budget physique est très largement respecté : le pas physique complet (Rapi
 - **Machine d'entrée de gamme** (portable sans carte dédiée, GPU intégré) : rien de mesuré. C'est le point qui peut contredire l'objectif de 60 FPS.
 - **Ville dense** : la scène de Paris mesurée est une rue ; un quartier à plusieurs milliers de bâtiments par chunk n'a pas été chargé.
 - **Mémoire GPU et fuite de ressources** sur une longue session (plusieurs recentrages, éviction de centaines de chunks).
-- **Scintillement visuel au recentrage de l'origine flottante.** L'automatisation prouve qu'il a lieu sans erreur et sans trou de chunk ; elle ne mesure pas une éventuelle saccade de l'image à ce moment précis (voir `useFloatingOrigin.ts`).
+- **Saccade de durée d'image au recentrage.** La continuité de position est mesurée (0,6 m) ; le temps d'image pendant que les corps fixes des chunks sont recréés (quelques centaines de colliders, une fois par kilomètre) n'est suivi que par le maximum de génération de chunk et le p95 du panneau, pas isolé sur l'instant du recentrage.
 - Temps de chargement initial sur réseau lent (le moteur 3D et la physique pèsent ≈ 1,1 Mo compressés, chargés au lancement d'une partie).
 
 ## Poids du build

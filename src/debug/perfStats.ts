@@ -62,7 +62,7 @@ export const perfStats = {
   /** Durée de construction d'un chunk (graphes de routes, bâtiments, eau) en ms : sur le thread principal, donc visible en saccade. */
   chunkBuildMs: new RollingWindow(WINDOW_FRAMES),
   /** Compteurs du monde streamé, mis à jour par useChunkStreamer et useFloatingOrigin. */
-  world: { activeChunks: 0, failedChunks: 0, recenters: 0, chunkCrossings: 0 },
+  world: { activeChunks: 0, failedChunks: 0, recenters: 0, chunkCrossings: 0, recenterJumpM: 0, steadyJumpM: 0, vehicleWorldXM: 0 },
   /** Compteurs de scène, rafraîchis périodiquement (pas à chaque image). */
   scene: { triangles: 0, drawCalls: 0, geometries: 0, textures: 0, colliders: 0, bodies: 0 },
 };
@@ -99,6 +99,12 @@ export interface PerfSnapshot {
   recenters: number;
   /** Nombre de fois où la voiture a changé de chunk (frontières de 256 m franchies) depuis le début de la partie. */
   chunkCrossings: number;
+  /** Plus grand saut du vecteur voiture→caméra rendu (m) entre deux images consécutives juste après un recentrage de l'origine flottante. */
+  recenterJumpM: number;
+  /** Plus grand saut du même vecteur en conduite normale (m) : référence pour juger recenterJumpM. */
+  steadyJumpM: number;
+  /** Position est-ouest du véhicule (m) dans le repère MONDE (ancre du lieu choisi), indépendante des recentrages. */
+  vehicleWorldXM: number;
   chunkBuildAverageMs: number;
   chunkBuildMaxMs: number;
 }
@@ -138,6 +144,6 @@ export function resetPerfStats() {
   perfStats.physicsStepMs.clear();
   perfStats.vehicleSolverMs.clear();
   perfStats.chunkBuildMs.clear();
-  perfStats.world = { activeChunks: 0, failedChunks: 0, recenters: 0, chunkCrossings: 0 };
+  perfStats.world = { activeChunks: 0, failedChunks: 0, recenters: 0, chunkCrossings: 0, recenterJumpM: 0, steadyJumpM: 0, vehicleWorldXM: 0 };
   perfStats.scene = { triangles: 0, drawCalls: 0, geometries: 0, textures: 0, colliders: 0, bodies: 0 };
 }

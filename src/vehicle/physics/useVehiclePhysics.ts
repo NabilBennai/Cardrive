@@ -2,6 +2,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types';
 import { perfStats } from '../../debug/perfStats';
+import { markPhysicsStep } from './stepClock';
 import { VehicleSimulation, type WheelPose } from './VehicleSimulation';
 
 export type { WheelPose } from './VehicleSimulation';
@@ -39,6 +40,7 @@ export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelP
     const body = bodyRef.current;
     if (!body) return;
     const solverStart = performance.now();
+    markPhysicsStep(solverStart);
     const telemetry = simulation.step(world, rapier, body, input.current);
     perfStats.vehicleSolverMs.push(performance.now() - solverStart);
     telemetryRef.current = telemetry;

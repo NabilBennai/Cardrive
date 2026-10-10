@@ -44,6 +44,8 @@ export function PerfOverlay({ visible }: { visible: boolean }) {
       {row('Géométries · textures', `${formatCount(snapshot.geometries)} · ${formatCount(snapshot.textures)}`, undefined, 'gpu-memory')}
       {row('Chunks actifs · échec · franchis · recentrages', `${snapshot.activeChunks} · ${snapshot.failedChunks} · ${snapshot.chunkCrossings} · ${snapshot.recenters}`, undefined, 'chunks')}
       {row('Génération de chunk moy. · max', `${format(snapshot.chunkBuildAverageMs)} · ${format(snapshot.chunkBuildMaxMs)} ms`, 'chunks', 'chunk-build')}
+      {row('Saut caméra : recentrage · normal', `${format(snapshot.recenterJumpM, 2)} · ${format(snapshot.steadyJumpM, 2)} m`, undefined, 'jump')}
+      {row('Position monde (est)', `${format(snapshot.vehicleWorldXM, 0)} m`, undefined, 'world-x')}
       {heap && row('Mémoire JS', `${format(heap.usedMb, 0)} / ${format(heap.limitMb, 0)} Mo`)}
     </aside>
   );

@@ -1,11 +1,12 @@
 import { RigidBody, type RapierRigidBody, CuboidCollider } from '@react-three/rapier';
 import { useFrame } from '@react-three/fiber';
 import { Suspense, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
-import { ExtrudeGeometry, Shape, type Group } from 'three';
+import { ExtrudeGeometry, Quaternion, Shape, Vector3, type Group } from 'three';
 import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types';
 import { genericVehicle } from '../configs/genericVehicle';
 import { groundDistanceM, restSuspensionM } from '../configs/vehicleProfiles';
 import { useVehiclePhysics, type WheelPose } from '../physics/useVehiclePhysics';
+import { extrapolationSeconds } from '../physics/stepClock';
 import { KenneyCarModel } from './KenneyCarModel';
 import {
   resetVehicleBody, vehicleColliderMassProperties, vehicleColliderOffsetY, vehicleSpawnHeightM,
@@ -353,6 +354,34 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
   const wheelPosesRef = useRef(initialWheelPoses(config));
   const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep });
   const previousRespawnVersion = useRef(respawnVersion);
+  const visualRef = useRef<Group>(null);
+  const extrapolation = useRef({ offset: new Vector3(), bodyRotation: new Quaternion(), inverse: new Quaternion(), delta: new Quaternion(), axis: new Vector3() });
+
+  // Lissage visuel par EXTRAPOLATION : la physique avance à 60 Hz fixes, le rendu à sa propre cadence. Plutôt que
+  // l'interpolation de @react-three/rapier (désactivée dans DrivingScene : elle conserve la position du pas précédent, qui
+  // devient fausse de ≈ 1 km quand l'origine flottante est recentrée et faisait traverser l'écran à la voiture), on avance
+  // les visuels de vitesse × temps écoulé depuis le dernier pas, dans le repère local du châssis. Aucun état passé : un
+  // déplacement d'origine ou un respawn est donc invisible.
+  useFrame(() => {
+    const visual = visualRef.current;
+    const body = bodyRef.current;
+    if (!visual || !body) return;
+    const seconds = extrapolationSeconds();
+    const { offset, bodyRotation, inverse, delta, axis } = extrapolation.current;
+    const rotation = body.rotation();
+    bodyRotation.set(rotation.x, rotation.y, rotation.z, rotation.w);
+    inverse.copy(bodyRotation).invert();
+    const velocity = body.linvel();
+    visual.position.copy(offset.set(velocity.x, velocity.y, velocity.z).multiplyScalar(seconds).applyQuaternion(inverse));
+    const angular = body.angvel();
+    const angle = Math.hypot(angular.x, angular.y, angular.z) * seconds;
+    if (angle > 1e-6) {
+      delta.setFromAxisAngle(axis.set(angular.x, angular.y, angular.z).normalize(), angle);
+      visual.quaternion.copy(inverse).multiply(delta).multiply(bodyRotation);
+    } else {
+      visual.quaternion.identity();
+    }
+  });
   const spawnPosition = useMemo(() => spawnPose?.position ?? { ...VEHICLE_SPAWN, y: vehicleSpawnHeightM(config) }, [spawnPose?.position, config]);
   // Mémorisés : react-three-rapier recrée le collider (et réinitialise sa masse) quand ces props changent d'identité,
   // et ce composant se re-rend à chaque mise à jour de télémétrie (~10 fois par seconde).
@@ -409,6 +438,7 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
         friction={VEHICLE_COLLIDER_FRICTION}
         restitution={VEHICLE_COLLIDER_RESTITUTION}
       />
+      <group ref={visualRef}>
       {modelUrl ? (
         <Suspense fallback={null}>
           <KenneyCarModel url={modelUrl} config={config} wheelPosesRef={wheelPosesRef} groundOffsetM={-groundDistanceM(config)} />
@@ -433,6 +463,7 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
           ))}
         </>
       )}
+      </group>
     </RigidBody>
   );
 }

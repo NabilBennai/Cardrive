@@ -35,13 +35,13 @@ Légende des statuts : ✅ livré · 🟡 partiel · ⬜ à faire.
 | Pneus et transmission | Pacejka en glissement combiné, rotation des roues, différentiel ouvert, inertie moteur, ABS prédictif, thermique à 2 nœuds | ✅ | `tireModel.ts`, `VehicleSimulation.ts`, [step-6-tire-model.md](architecture/step-6-tire-model.md) |
 | Calibration | 12 contrôles automatiques (repos, accélération, freinage, recul, virage, slalom, bosse, collision, respawn, pause), indépendants de la cadence 30/60/120 Hz | ✅ | `scripts/calibrate-vehicle.mjs`, [step-2-calibration.md](architecture/step-2-calibration.md) |
 | Routes réelles | Projection locale, Overpass avec repli sur 3 miroirs, géocodage Nominatim avec autocomplétion, cache IndexedDB (versionné) | ✅ | `src/geo/`, `src/map/` |
-| Streaming | Chunks de 256 m (physique 3×3, rendu 5×5), origine flottante, machine d’états, sol de secours | ✅ vérifié en navigateur sur ville synthétique (7 frontières, 2 recentrages) ; scintillement au recentrage non mesuré | `src/world/streaming/` |
+| Streaming | Chunks de 256 m (physique 3×3, rendu 5×5), origine flottante atomique, machine d’états, sol de secours | ✅ vérifié en navigateur : 7 frontières, 2 recentrages, saut de caméra 0,6 m, colliders alignés | `src/world/streaming/` |
 | Décor OSM | Bâtiments extrudés avec colliders, trottoirs avec collision (coupés aux carrefours, y compris entre chunks voisins), eau (surfaces, rivières, mur invisible), textures procédurales | ✅ | `src/world/` |
 | Catalogue de voitures | 18 véhicules (prototype + 17 modèles Kenney CC0), garage, mémorisation du choix | ✅ | `src/vehicle/catalog/`, `public/models/cars/` |
 | Physique par véhicule | Profil réel (masse, gabarit, puissance, rapports, grip, freins, aéro, direction, transmission) → configuration complète | ✅ | `vehicleProfiles.ts` |
 | Circuits F1 2026 | 24 tracés (piste, vibreurs, murs, ligne de départ), mini-carte hors ligne, sélecteur avec vignettes | ✅ | `src/circuits/` |
 | Interface | Menu, garage, lieux récents, HUD (vitesse, rapport, régime, détails avec `T`), pause, tactile | ✅ | `src/app/`, `src/ui/` |
-| Qualité | 157 tests, 12 contrôles de calibration, 7 scénarios de bout en bout, panneau de performance (F3), CI | ✅ | `tests/`, `scripts/`, `src/debug/` |
+| Qualité | 157 tests, 12 contrôles de calibration, 8 scénarios de bout en bout, panneau de performance (F3), CI GitHub verte | ✅ | `tests/`, `scripts/`, `src/debug/` |
 
 ### 1.2 Chiffres de référence (prototype, pneus froids)
 
@@ -81,12 +81,12 @@ Terminée le 10 octobre 2026. Bilan par fiche ; le détail des mesures est dans 
 | --- | --- | --- |
 | R-0.1 Vitesse de pointe | ✅ | 189 km/h (publié : 188). 0-100 en 9,9 s (publié : 10,5-10,8 s) |
 | R-0.2 Vérification visuelle automatisée | ✅ | `npm run e2e` : 7 scénarios, images de référence, console surveillée |
-| R-0.3 Conduite réelle des chunks | 🟡 | Streaming et recentrage validés en navigateur sur une ville synthétique ; une vraie ville validée sur 30 s sans recentrage ; **le scintillement visuel au recentrage n'est pas mesuré** |
+| R-0.3 Conduite réelle des chunks | ✅ | **Trois défauts réels corrigés** (voiture qui traverse l'écran au recentrage, colliders de bâtiments restés dans l'ancien repère, ombres absentes hors de l'origine). Validé en navigateur : 7 frontières, 2 recentrages, saut de caméra 0,6 m |
 | R-0.4 Budget de performance | ✅ | Panneau F3, budgets, mesures sur la machine de développement ; **machine d'entrée de gamme non mesurée** |
 | R-0.5 Fins de ligne, licences | ✅ | `.gitattributes`, `NOTICE`, `README.md` |
 | R-0.6 Miroirs Overpass | ✅ | Santé des miroirs, nouveaux miroirs ; les services publics restent instables |
 | R-0.7 Cohérence | ✅ | Noms, seuils, tests ajoutés |
-| R-0.8 Déploiement statique | 🟡 | `vercel.json` et CI prêts ; **non déployé** (nécessite un compte) |
+| R-0.8 Déploiement statique | 🟡 | `vercel.json` prêt ; **CI GitHub verte** (lint, typecheck, tests, build) ; **non déployé** (nécessite un compte) |
 
 ### R-0.1 Vitesse de pointe ✅
 - **Causes trouvées** (deux, cumulées, et aucune dans le moteur) : l'amortissement linéaire de Rapier (`linearDamping: 0.01`) retirait 1 % de la vitesse par seconde, soit ≈ 530 N à 173 km/h, une résistance fantôme qui doublait presque la traînée de l'air ; la surface frontale (2,69 m²) était le rectangle largeur × hauteur et non la surface réelle d'une voiture (≈ 87 %, soit 2,2 m²).
@@ -95,15 +95,21 @@ Terminée le 10 octobre 2026. Bilan par fiche ; le détail des mesures est dans 
 - **Reste** : le 0-100 simulé est 6 à 9 % plus rapide que le chiffre publié.
 
 ### R-0.2 Vérification visuelle automatisée ✅
-- **Contenu** (`scripts/e2e/`, `npm run e2e`) : menu, garage (18 véhicules, caractéristiques), catalogue de circuits (24), conduite à Monaco, pause et reprise, choix d'un camion et conduite à Singapour, ville synthétique. Échoue sur toute erreur de console, tout écran uniforme, toute régression visuelle des écrans d'interface au-delà de 0,4 % de pixels, tout dépassement grossier du budget physique.
+- **Contenu** (`scripts/e2e/`, `npm run e2e`) : menu, garage (18 véhicules, caractéristiques), catalogue de circuits (24), conduite à Monaco, pause et reprise, choix d'un camion et conduite à Singapour, ville synthétique (streaming, recentrage), collision contre un mur après deux recentrages. Échoue sur toute erreur de console, tout écran uniforme, toute régression visuelle des écrans d'interface au-delà de 0,4 % de pixels, tout dépassement grossier du budget physique.
 - **Pilote** : Chrome sans interface par le protocole DevTools, sans dépendance. Rendu logiciel (SwiftShader) par défaut pour la reproductibilité, `--gpu` pour des mesures représentatives.
 - **Ce qu'il a trouvé au premier passage** : un `favicon.ico` absent (erreur 404 en console, en production aussi).
-- **Limites** : les scènes 3D ne sont pas comparées pixel à pixel (non déterministes) ; elles sont validées par des assertions (accélération, rendu non uniforme, compteurs). Les images de référence dépendent de la police du système : `npm run e2e:update` sur une autre machine.
+- **Limites** : les scènes 3D ne sont pas comparées pixel à pixel (non déterministes) ; elles sont validées par des assertions (accélération, rendu non uniforme, compteurs, saut de caméra, position d'arrêt contre un mur). Une capture en fin de conduite (`scripts/e2e/output/*-fin.png`) permet de vérifier à l'œil l'éclairage et les ombres. Les images de référence dépendent de la police du système : `npm run e2e:update` sur une autre machine.
 
-### R-0.3 Conduite réelle des chunks 🟡
-- **Fait** : compteurs ajoutés au panneau F3 (chunks actifs, en échec, frontières franchies, recentrages, durée de génération). Scénario **déterministe et hors ligne** : une ville synthétique de 5 km servie à la place d'Overpass et de Nominatim (interception réseau) ; 45 s de conduite à 185 km/h franchissent 7 frontières de chunk et déclenchent 2 recentrages d'origine flottante, sans chunk en échec ni erreur de console, génération de chunk ≤ 0,3 ms. Test unitaire de couverture le long d'une route de 4 km (`tests/streamingCoverage.test.ts`).
-- **Vraie ville** (`--network`) : Paris, 30 puis 75 s, voiture à 162 km/h maximum ; 0 chunk en échec ; **le seuil de recentrage n'a pas été atteint** et le nombre de frontières franchies n'était pas encore compté à ce moment (cause non établie : arrêt contre un obstacle probable, la rue n'étant pas droite). Les services Overpass ayant ensuite refusé les requêtes répétées, ce scénario n'a pas pu être refait avec les compteurs.
-- **Reste** : mesurer le scintillement visuel à l'instant du recentrage (comparaison d'images consécutives autour de l'événement) ; quartier très dense ; limite connue R-4.6 (une voie plus longue que le rayon de rendu disparaît derrière le véhicule, codée comme échec attendu dans les tests).
+### R-0.3 Conduite réelle des chunks ✅
+Mesurer au lieu de supposer a trouvé **trois défauts réels**, absents de tous les tests unitaires :
+
+1. **La voiture traversait l'écran au recentrage de l'origine flottante.** Le vecteur voiture→caméra sautait de **351 m** (rendu matériel) à **915 m** (logiciel) entre deux images, contre ≈ 1 m en conduite normale. Causes cumulées : le châssis était déplacé dans le pas physique alors que chunks et caméra attendaient le rendu suivant ; l'interpolation de `@react-three/rapier` dessine le châssis entre sa position du pas précédent et celle du pas courant, deux repères différents après le déplacement ; et la caméra était replacée à sa position idéale alors qu'elle suit normalement avec ≈ 13 m de retard à 185 km/h. **Correctifs** : recentrage en deux temps, appliqué dans la même validation que les chunks (`FloatingOriginApplier`) ; interpolation de Rapier remplacée par une extrapolation sans état passé (`GenericCar`, `stepClock.ts`) ; caméra décalée du même vecteur que le monde au lieu d'être replacée. **Résultat : saut de 0,5 à 0,6 m, indiscernable de la conduite normale (0,5 à 0,7 m).**
+2. **Les colliders des bâtiments restaient dans l'ancien repère après un recentrage.** `@react-three/rapier` ne relit la position d'un corps fixe que si l'une de *ses* propriétés change ; ici c'est le groupe parent qui bouge. Un mur placé à 2,5 km, après deux recentrages, laissait passer la voiture à 188 km/h (et des murs fantômes existaient ailleurs). **Correctif** : l'ancre fait partie de la clé de chaque corps fixe, ils sont recréés dans la validation qui déplace les groupes. **Résultat : arrêt contre le mur à 2,5 m de la valeur attendue après 1, 2 et 3 recentrages.** *Ce défaut touchait tous les bâtiments, trottoirs et plans d'eau en ville dès le premier kilomètre.*
+3. **Plus d'ombres au-delà de 75 m de l'origine.** La lumière et sa zone d'ombre étaient fixes ; en ville l'origine se recentre toutes les ≈ 1 km, la voiture roulait donc presque tout le temps hors de la zone, sans ombre ni celle des bâtiments. **Correctif** : `FollowingSun` suit la voiture. Il a révélé de l'**acné d'ombre** (motif moiré sur les trottoirs et les murs de circuit, déjà visible avant sans qu'on le remarque) : biais de carte d'ombre réglé.
+
+- **Scénarios** (`npm run e2e`) : ville synthétique **déterministe et hors ligne** (avenue de 5 km avec immeubles, trottoirs et étang, servie à la place d'Overpass et de Nominatim) : 45 s à 185 km/h, 7 frontières de chunk franchies, 2 recentrages, 0 chunk en échec, génération de chunk ≤ 0,3 ms, saut de caméra < 5 m exigé ; mur à 2,5 km exigé arrêtant la voiture après deux recentrages. Un test unitaire couvre la route longue (`tests/streamingCoverage.test.ts`). Le premier mock avait lui-même un défaut (anneaux de bâtiments mal fermés, tous rejetés : la ville n'avait aucun bâtiment) : trouvé en voyant le mur ne rien arrêter.
+- **Vraie ville** (`--network`) : Paris, 30 puis 75 s, 162 km/h, 0 chunk en échec ; le seuil de recentrage n'y a pas été atteint (cause non établie). Les services publics ont ensuite limité les accès répétés : à refaire quand ils répondent.
+- **Reste** : quartier très dense ; limite connue R-4.6 (une voie plus longue que le rayon de rendu disparaît derrière le véhicule, codée comme échec attendu).
 
 ### R-0.4 Budget de performance ✅
 - Panneau F3 : images/s, p95, pas physique, solveur véhicule, triangles, appels de rendu, colliders, mémoire, chunks. Budgets et tests (`tests/perfStats.test.ts`). Machine de référence : i5-13400F / RTX 4070.
@@ -332,7 +338,7 @@ Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout :
 
 | Jalon | Contenu | Résultat attendu |
 | --- | --- | --- |
-| **M1 — Fiable** ✅ | R-0.1 à R-0.8 (R-0.3 et R-0.8 partiels) | Un jeu mesuré, dont les régressions sont détectées ; reste à déployer |
+| **M1 — Fiable** ✅ | R-0.1 à R-0.8 (R-0.8 : déploiement restant) | Un jeu mesuré, dont les régressions sont détectées ; reste à déployer |
 | **M2 — Vivant** | R-1.1 à R-1.4, R-6.3, R-3.1 | Moteur, pneus, impacts, particules, caméras, surfaces : la conduite « se sent » |
 | **M3 — Compétitif** | R-2.1 à R-2.3, R-2.5, R-2.6, R-6.5 | Chrono, records, fantôme, départ, classement, nouveaux modes |
 | **M4 — Adversaires** | R-3.3, R-2.4, R-3.8, R-6.1 | IA, aides réglables, boîte manuelle, manette |

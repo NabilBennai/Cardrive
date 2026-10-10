@@ -30,6 +30,8 @@ interface StreamingRoadNetworkProps {
 }
 
 interface ChunkGroupProps {
+  /** Identifie l'ancre de rendu courante : change à chaque recentrage de l'origine flottante (voir la note sur les colliders ci-dessous). */
+  anchorKey: string;
   chunk: StreamedChunk;
   offset: [number, number, number];
   materials: MeshStandardMaterial[];
@@ -70,7 +72,15 @@ function foreignCarriagewaysFor(chunk: StreamedChunk, chunks: StreamedChunk[], w
 const sidewalkMaterial = new MeshStandardMaterial({ color: '#9a9b96', roughness: 0.95, side: DoubleSide });
 const waterMaterial = new MeshStandardMaterial({ color: '#2f6f9f', roughness: 0.25, metalness: 0.1, side: DoubleSide });
 
-function ChunkGroup({ chunk, offset, materials, asphaltTexture, foreignCarriageways }: ChunkGroupProps) {
+/*
+ * Colliders et origine flottante : @react-three/rapier ne relit la position d'un corps FIXE que si l'une de SES propres
+ * propriétés change ; or, au recentrage, c'est le groupe parent (le décalage du chunk) qui bouge. Le décor se déplaçait donc
+ * visuellement mais ses colliders restaient dans l'ancien repère : après un recentrage la voiture traversait les bâtiments
+ * et heurtait des murs fantômes (mesuré : un mur à 2,5 km, après deux recentrages, laissait passer la voiture à 188 km/h).
+ * On inclut donc l'ancre dans la clé de chaque corps fixe : ils sont recréés, à leur nouvelle position, dans la validation
+ * même qui déplace les groupes.
+ */
+function ChunkGroup({ anchorKey, chunk, offset, materials, asphaltTexture, foreignCarriageways }: ChunkGroupProps) {
   const layout = useMemo(() => buildRoadNetworkLayoutSubset(chunk), [chunk]);
   const buildingLayout = useMemo(() => buildBuildingLayout(chunk.buildingGraph, BUILDING_BASE_Y, materials.length), [chunk, materials.length]);
   const sidewalkLayout = useMemo(() => buildSidewalkLayout(chunk.graph, foreignCarriageways), [chunk, foreignCarriageways]);
@@ -100,7 +110,7 @@ function ChunkGroup({ chunk, offset, materials, asphaltTexture, foreignCarriagew
         <mesh geometry={sidewalkLayout.visual} material={sidewalkMaterial} receiveShadow castShadow />
       )}
       {sidewalkLayout.collider && sidewalkLayout.visual && (
-        <RigidBody key={sidewalkLayout.visual.uuid} type="fixed" colliders={false}>
+        <RigidBody key={`${sidewalkLayout.visual.uuid}@${anchorKey}`} type="fixed" colliders={false}>
           <TrimeshCollider args={[sidewalkLayout.collider.vertices, sidewalkLayout.collider.indices]} />
         </RigidBody>
       )}
@@ -108,12 +118,12 @@ function ChunkGroup({ chunk, offset, materials, asphaltTexture, foreignCarriagew
         <mesh key={`water-${index}`} geometry={geometry} material={waterMaterial} />
       ))}
       {waterLayout.collider && (
-        <RigidBody type="fixed" colliders={false}>
+        <RigidBody key={`water@${anchorKey}`} type="fixed" colliders={false}>
           <TrimeshCollider args={[waterLayout.collider.vertices, waterLayout.collider.indices]} />
         </RigidBody>
       )}
       {buildingLayout.map((placement) => (
-        <RigidBody key={placement.id} type="fixed" colliders={false}>
+        <RigidBody key={`${placement.id}@${anchorKey}`} type="fixed" colliders={false}>
           <mesh geometry={placement.geometry} material={materials[placement.materialIndex]} castShadow receiveShadow />
           <CuboidCollider position={placement.aabbCenterM} args={placement.aabbHalfExtentM} />
         </RigidBody>
@@ -135,6 +145,7 @@ function buildRoadNetworkLayoutSubset(chunk: StreamedChunk) {
 
 export function StreamingRoadNetwork({ worldAnchor, renderAnchor, telemetryRef, initialChunks, onZoneUnavailable }: StreamingRoadNetworkProps) {
   const streamer = useChunkStreamer(worldAnchor, renderAnchor, telemetryRef, initialChunks);
+  const anchorKey = `${renderAnchor.latitudeDeg},${renderAnchor.longitudeDeg}`;
 
   useEffect(() => { onZoneUnavailable?.(streamer.zoneUnavailable); }, [streamer.zoneUnavailable, onZoneUnavailable]);
 
@@ -173,7 +184,7 @@ export function StreamingRoadNetwork({ worldAnchor, renderAnchor, telemetryRef, 
       {streamer.activeChunks.map((chunk) => {
         const local = chunkRenderOffset(chunk.key, worldAnchor, renderAnchor);
         const offset: [number, number, number] = [local.xM, 0, local.zM];
-        return <ChunkGroup key={`${chunk.key.x},${chunk.key.z}`} chunk={chunk} offset={offset} materials={materials} asphaltTexture={asphaltTexture} foreignCarriageways={foreignCarriagewaysFor(chunk, streamer.activeChunks, worldAnchor)} />;
+        return <ChunkGroup key={`${chunk.key.x},${chunk.key.z}`} anchorKey={anchorKey} chunk={chunk} offset={offset} materials={materials} asphaltTexture={asphaltTexture} foreignCarriageways={foreignCarriagewaysFor(chunk, streamer.activeChunks, worldAnchor)} />;
       })}
     </group>
   );

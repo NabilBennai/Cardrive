@@ -46,6 +46,16 @@ function buildWorld() {
 
 const world = buildWorld();
 
+/** Mur de 6 m d'épaisseur en travers de l'avenue (toute la largeur de la route), activable pour les tests de collision. */
+export const OBSTACLE = { x: Number(process.env.E2E_WALL_X ?? 2_500), thicknessM: 6 };
+let obstacleEnabled = false;
+export const setObstacle = (enabled) => { obstacleEnabled = enabled; };
+const obstacleBuilding = () => ({
+  id: 9_000_001,
+  ring: [[OBSTACLE.x, ROAD.z - 14], [OBSTACLE.x + OBSTACLE.thicknessM, ROAD.z - 14], [OBSTACLE.x + OBSTACLE.thicknessM, ROAD.z + 14], [OBSTACLE.x, ROAD.z + 14], [OBSTACLE.x, ROAD.z - 14]],
+  levels: 3,
+});
+
 const inBox = (point, box) => point[0] >= box.west && point[0] <= box.east && point[1] >= box.north && point[1] <= box.south;
 
 /** Boîte locale (mètres) d'une emprise géographique `(sud,ouest,nord,est)`. */
@@ -72,12 +82,15 @@ export function answerOverpass(queryText) {
     return { elements };
   }
 
-  const wanted = /"building"/.test(queryText) ? world.buildings.map((b) => ({ id: b.id, points: b.ring, tags: { building: 'yes', 'building:levels': String(b.levels) } }))
+  const wanted = /"building"/.test(queryText) ? (obstacleEnabled ? [...world.buildings, obstacleBuilding()] : world.buildings).map((b) => ({ id: b.id, points: b.ring, tags: { building: 'yes', 'building:levels': String(b.levels) } }))
     : world.roads.map((r) => ({ id: r.id, points: r.points, tags: { highway: 'primary', lanes: '2' } }));
   for (const way of wanted) {
     if (!intersects(way.points, box)) continue;
     const nodeIds = [];
-    for (const [x, z] of way.points) {
+    const closed = way.points.length > 3 && way.points[0][0] === way.points[way.points.length - 1][0] && way.points[0][1] === way.points[way.points.length - 1][1];
+    for (const [index, [x, z]] of way.points.entries()) {
+      // Un anneau fermé OSM réutilise le MÊME nœud pour son premier et son dernier point (sinon l'application le rejette : « anneau ouvert »).
+      if (closed && index === way.points.length - 1) { nodeIds.push(nodeIds[0]); continue; }
       const nodeId = id();
       const g = toGeo(x, z);
       elements.push({ type: 'node', id: nodeId, lat: g.latitude, lon: g.longitude });
