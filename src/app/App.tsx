@@ -16,6 +16,7 @@ import { GeoLoadingScreen, type GeoLoadingScreenState } from './GeoLoadingScreen
 import { GeoLoadError, loadRoadWorld, type LoadedRoadWorld } from './geoOrchestrator';
 import type { DrivingWorld } from './DrivingScene';
 import { Minimap } from '../ui/Minimap';
+import { CircuitMinimap } from '../ui/CircuitMinimap';
 
 const isTouchDevice = typeof window !== 'undefined' && (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
 
@@ -258,14 +259,20 @@ export function App() {
         <TouchControls setStick={touchInput.setStick} setHandbrake={touchInput.setHandbrake} />
       )}
 
-      {playing && !useDemoTrack && (renderAnchor ?? lastPlace) && (
+      {playing && circuitTrack && (
+        <div className="minimap-panel">
+          <CircuitMinimap track={circuitTrack} positionM={telemetry.positionM} headingRad={telemetry.headingRad} />
+        </div>
+      )}
+
+      {playing && !circuitTrack && !useDemoTrack && (renderAnchor ?? lastPlace) && (
         <div className="minimap-panel">
           <Minimap anchor={(renderAnchor ?? lastPlace)!} positionM={telemetry.positionM} headingRad={telemetry.headingRad} />
           <p className="minimap-attribution">© OpenStreetMap contributors</p>
         </div>
       )}
 
-      {playing && !useDemoTrack && (
+      {playing && !circuitTrack && !useDemoTrack && (
         <p className="osm-attribution">© contributeurs OpenStreetMap · données via Overpass API</p>
       )}
 
