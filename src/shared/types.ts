@@ -98,7 +98,16 @@ export interface VehicleConfig {
   directionChangeDelayS: number;
   maximumReverseSpeedMps: number;
   steeringRateRadPerS: number;
-  tireCorneringStiffnessPerRad: number;
+  /** Taux de glissement longitudinal au pic d'adhérence du pneu (≈ 0,10-0,15). */
+  tirePeakSlipRatio: number;
+  /** Angle de dérive (rad) au pic d'adhérence latérale (≈ 0,10-0,15). */
+  tirePeakSlipAngleRad: number;
+  /** Force de glissement franc / force de pic (≈ 0,8). */
+  tireSlidingGripRatio: number;
+  /** Perte relative de coefficient d'adhérence par unité de surcharge de la roue. */
+  tireLoadSensitivity: number;
+  /** Inertie du volant moteur et du vilebrequin (kg·m²), ramenée aux roues par le rapport au carré. */
+  engineInertiaKgM2: number;
   lowSpeedTireDampingNsPerM: number;
   frontBrakeBias: number;
   handbrakeRearGripFactor: number;
@@ -108,10 +117,10 @@ export interface VehicleConfig {
   linearDamping: number;
   angularDamping: number;
   ambientTemperatureC: number;
+  /** Température de bande de roulement d'adhérence maximale (°C). */
   tireOptimalTemperatureC: number;
+  /** Demi-largeur (°C) de la fenêtre chaude : perte d'adhérence au-delà de l'optimum. */
   tireTemperatureFalloffC: number;
+  /** Plancher du facteur d'adhérence lié à la température. */
   tireMinGripMultiplier: number;
-  tireThermalMassJPerC: number;
-  tireCoolingWPerC: number;
-  tireCoolingSpeedFactorPerMps: number;
 }

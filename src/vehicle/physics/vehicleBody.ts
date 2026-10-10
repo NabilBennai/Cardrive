@@ -1,5 +1,6 @@
 ﻿import type { RapierRigidBody } from '@react-three/rapier';
 import type { VehicleConfig } from '../../shared/types.ts';
+import { groundDistanceM } from '../configs/vehicleProfiles.ts';
 
 export const VEHICLE_FIXED_STEP_S = 1 / 60;
 export const VEHICLE_SPAWN = { x: 38, y: 0.8, z: 0 };
@@ -14,6 +15,26 @@ export function vehicleMassProperties(config: VehicleConfig) {
     principalAngularInertia: { x: config.principalInertiaKgM2.xM, y: config.principalInertiaKgM2.yM, z: config.principalInertiaKgM2.zM },
     angularInertiaLocalFrame: { x: 0, y: 0, z: 0, w: 1 },
   };
+}
+
+/**
+ * Hauteur du centre du collider cuboïde par rapport à l'origine du châssis : son bas reste
+ * 2 cm au-dessus du sol au repos, quelle que soit la hauteur du véhicule (un camion de 3,3 m
+ * ou un kart de 0,85 m ne doivent pas traîner leur caisse au sol ou flotter).
+ */
+export function vehicleColliderOffsetY(config: VehicleConfig): number {
+  return -groundDistanceM(config) + 0.02 + config.dimensionsM.heightM / 2;
+}
+
+/** Propriétés de masse exprimées dans le repère LOCAL du collider (centre de masse décalé de l'offset du collider). */
+export function vehicleColliderMassProperties(config: VehicleConfig) {
+  const properties = vehicleMassProperties(config);
+  return { ...properties, centerOfMass: { ...properties.centerOfMass, y: properties.centerOfMass.y - vehicleColliderOffsetY(config) } };
+}
+
+/** Hauteur d'apparition de l'origine du châssis : un peu au-dessus de sa position de repos, la suspension absorbe la chute. */
+export function vehicleSpawnHeightM(config: VehicleConfig): number {
+  return groundDistanceM(config) + 0.12;
 }
 
 const IDENTITY_ROTATION = { x: 0, y: 0, z: 0, w: 1 };

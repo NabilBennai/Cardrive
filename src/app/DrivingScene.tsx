@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { Physics, type RapierRigidBody } from '@react-three/rapier';
 import { Suspense, useEffect } from 'react';
 import type { GeoAnchor } from '../geo/projection';
-import type { VehicleInput, VehicleTelemetry } from '../shared/types';
+import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../shared/types';
 import { ChaseCamera } from '../camera/ChaseCamera';
 import { CircuitScene } from '../circuits/CircuitScene';
 import type { CircuitTrack } from '../circuits/circuitGeometry';
@@ -12,7 +12,7 @@ import { StreamingRoadNetwork } from '../world/streaming/StreamingRoadNetwork';
 import { useFloatingOrigin } from '../world/streaming/useFloatingOrigin';
 import type { StreamedChunk } from '../world/streaming/chunkOwnership';
 import type { RoadSpawnPose } from '../world/roads/spawnPlacement';
-import { headingToQuaternion, VEHICLE_FIXED_STEP_S } from '../vehicle/physics/vehicleBody';
+import { headingToQuaternion, vehicleSpawnHeightM, VEHICLE_FIXED_STEP_S } from '../vehicle/physics/vehicleBody';
 
 export type DrivingWorld =
   | { kind: 'demo' }
@@ -32,15 +32,17 @@ interface DrivingSceneProps {
   onZoneUnavailable?: (unavailable: boolean) => void;
   /** Modèle GLB du catalogue pour la carrosserie ; null/absent : carrosserie procédurale d'origine. */
   carModelUrl?: string | null;
+  /** Configuration physique du véhicule choisi. */
+  vehicle: VehicleConfig;
 }
 
 export function DrivingScene({
-  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl,
+  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle,
 }: DrivingSceneProps) {
   const spawnPose = world.kind === 'roads'
-    ? { position: { x: world.spawnPose.position.xM, y: 0.8, z: world.spawnPose.position.zM }, rotation: headingToQuaternion(world.spawnPose.headingRad) }
+    ? { position: { x: world.spawnPose.position.xM, y: vehicleSpawnHeightM(vehicle), z: world.spawnPose.position.zM }, rotation: headingToQuaternion(world.spawnPose.headingRad) }
     : world.kind === 'circuit'
-      ? { position: { x: world.track.spawn.xM, y: 0.8, z: world.track.spawn.zM }, rotation: headingToQuaternion(world.track.spawn.headingRad) }
+      ? { position: { x: world.track.spawn.xM, y: vehicleSpawnHeightM(vehicle), z: world.track.spawn.zM }, rotation: headingToQuaternion(world.track.spawn.headingRad) }
       : undefined;
   // Toujours appelé (règle des Hooks) ; sans effet pour la démo (worldAnchor fictive, jamais lue).
   const floatingOrigin = useFloatingOrigin(world.kind === 'roads' ? world.worldAnchor : { latitudeDeg: 0, longitudeDeg: 0 });
@@ -89,6 +91,7 @@ export function DrivingScene({
             spawnPose={spawnPose}
             onAfterPhysicsStep={world.kind === 'roads' ? floatingOrigin.onAfterPhysicsStep : undefined}
             modelUrl={carModelUrl}
+            config={vehicle}
           />
           <ChaseCamera bodyRef={bodyRef} snapVersion={cameraSnapVersion} />
         </Suspense>

@@ -1,14 +1,16 @@
 import { RigidBody, type RapierRigidBody, CuboidCollider } from '@react-three/rapier';
 import { useFrame } from '@react-three/fiber';
-import { Suspense, useCallback, useLayoutEffect, useRef } from 'react';
+import { Suspense, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { ExtrudeGeometry, Shape, type Group } from 'three';
-import type { VehicleInput, VehicleTelemetry } from '../../shared/types';
+import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types';
 import { genericVehicle } from '../configs/genericVehicle';
+import { groundDistanceM, restSuspensionM } from '../configs/vehicleProfiles';
 import { useVehiclePhysics, type WheelPose } from '../physics/useVehiclePhysics';
 import { KenneyCarModel } from './KenneyCarModel';
-import { resetVehicleBody, vehicleMassProperties, VEHICLE_COLLIDER_FRICTION, VEHICLE_COLLIDER_RESTITUTION, VEHICLE_SPAWN } from '../physics/vehicleBody';
-
-const rigidBodyMassProperties = vehicleMassProperties(genericVehicle);
+import {
+  resetVehicleBody, vehicleColliderMassProperties, vehicleColliderOffsetY, vehicleSpawnHeightM,
+  VEHICLE_COLLIDER_FRICTION, VEHICLE_COLLIDER_RESTITUTION, VEHICLE_SPAWN,
+} from '../physics/vehicleBody';
 
 export interface VehicleSpawnPose {
   position: { x: number; y: number; z: number };
@@ -27,13 +29,15 @@ interface GenericCarProps {
   onAfterPhysicsStep?: (telemetry: VehicleTelemetry, body: RapierRigidBody) => void;
   /** URL d'un modèle GLB du catalogue ; absente/null : carrosserie procédurale d'origine. Seul le visuel change, jamais la physique. */
   modelUrl?: string | null;
+  /** Configuration physique ; absente : prototype calibré (genericVehicle). */
+  config?: VehicleConfig;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
 // restylage 2013-2016 : ~3,94 x 1,73 x 1,53 m, empattement ~2,47 m) : la carrosserie
 // ci-dessous est construite à partir de ces nombres, jamais de valeurs indépendantes,
 // pour qu'elle reste toujours cohérente avec le châssis Rapier.
-const { lengthM: BODY_LENGTH_M, widthM: BODY_WIDTH_M, heightM: BODY_HEIGHT_M } = genericVehicle.dimensionsM;
+const { lengthM: BODY_LENGTH_M, widthM: BODY_WIDTH_M } = genericVehicle.dimensionsM;
 const HALF_LENGTH_M = BODY_LENGTH_M / 2;
 const HALF_WIDTH_M = BODY_WIDTH_M / 2;
 const FRONT_AXLE_Z = genericVehicle.wheelbaseM / 2;
@@ -111,13 +115,15 @@ const LUG_ANGLES = Array.from({ length: 5 }, (_, index) => (index / 5) * Math.PI
 const RIM_OUTER_R = WHEEL_RADIUS_M * 0.82;
 const RIM_INNER_R = WHEEL_RADIUS_M * 0.22;
 
-const initialWheelPoses = (): WheelPose[] => genericVehicle.wheelMounts.map(({ xM, zM }) => ({
+const initialWheelPoses = (config: VehicleConfig): WheelPose[] => config.wheelMounts.map(({ xM, zM }) => ({
   xM,
   zM,
-  suspensionM: WHEEL_REST_SUSPENSION_M,
+  suspensionM: restSuspensionM(config),
   steeringRad: 0,
   spinRad: 0,
-  temperatureC: genericVehicle.ambientTemperatureC,
+  omegaRadPerS: 0,
+  temperatureC: config.ambientTemperatureC,
+  carcassTemperatureC: config.ambientTemperatureC,
 }));
 
 /** Roue à jante aluminium 5 branches : pneu, disque de frein, jante, branches et écrous. */
@@ -343,29 +349,39 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl }: GenericCarProps) {
-  const wheelPosesRef = useRef(initialWheelPoses());
-  const physics = useVehiclePhysics({ bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep });
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle }: GenericCarProps) {
+  const wheelPosesRef = useRef(initialWheelPoses(config));
+  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep });
   const previousRespawnVersion = useRef(respawnVersion);
-  const spawnPosition = spawnPose?.position ?? VEHICLE_SPAWN;
+  const spawnPosition = useMemo(() => spawnPose?.position ?? { ...VEHICLE_SPAWN, y: vehicleSpawnHeightM(config) }, [spawnPose?.position, config]);
+  // Mémorisés : react-three-rapier recrée le collider (et réinitialise sa masse) quand ces props changent d'identité,
+  // et ce composant se re-rend à chaque mise à jour de télémétrie (~10 fois par seconde).
+  const colliderMassProperties = useMemo(() => vehicleColliderMassProperties(config), [config]);
+  const colliderPosition = useMemo<[number, number, number]>(() => [0, vehicleColliderOffsetY(config), 0], [config]);
+  const colliderArgs = useMemo<[number, number, number]>(
+    () => [config.dimensionsM.widthM / 2, config.dimensionsM.heightM / 2, config.dimensionsM.lengthM / 2],
+    [config],
+  );
 
   const respawn = useCallback(() => {
     const rigidBody = bodyRef.current;
     if (!rigidBody) return;
     resetVehicleBody(rigidBody, spawnPosition, spawnPose?.rotation);
     wheelPosesRef.current.forEach((wheel) => {
-      wheel.suspensionM = WHEEL_REST_SUSPENSION_M;
+      wheel.suspensionM = restSuspensionM(config);
       wheel.spinRad = 0;
       wheel.steeringRad = 0;
-      wheel.temperatureC = genericVehicle.ambientTemperatureC;
+      wheel.omegaRadPerS = 0;
+      wheel.temperatureC = config.ambientTemperatureC;
+      wheel.carcassTemperatureC = config.ambientTemperatureC;
     });
     telemetryRef.current = {
-      speedMps: 0, engineRpm: genericVehicle.idleRpm, gear: 1, slip: 0, groundedWheels: 0, throttle: 0, brake: 0, steering: 0,
+      speedMps: 0, engineRpm: config.idleRpm, gear: 1, slip: 0, groundedWheels: 0, throttle: 0, brake: 0, steering: 0,
       tireTemperaturesC: wheelPosesRef.current.map((wheel) => wheel.temperatureC),
       positionM: { xM: spawnPosition.x, zM: spawnPosition.z },
       headingRad: 0,
     };
-  }, [bodyRef, telemetryRef, spawnPosition, spawnPose?.rotation]);
+  }, [bodyRef, telemetryRef, spawnPosition, spawnPose?.rotation, config]);
 
   useLayoutEffect(() => {
     if (previousRespawnVersion.current !== respawnVersion) {
@@ -381,20 +397,21 @@ export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTel
       colliders={false}
       position={[spawnPosition.x, spawnPosition.y, spawnPosition.z]}
       quaternion={spawnPose ? [spawnPose.rotation.x, spawnPose.rotation.y, spawnPose.rotation.z, spawnPose.rotation.w] : undefined}
-      linearDamping={genericVehicle.linearDamping}
-      angularDamping={genericVehicle.angularDamping}
+      linearDamping={config.linearDamping}
+      angularDamping={config.angularDamping}
       ccd
       canSleep={false}
     >
       <CuboidCollider
-        args={[BODY_WIDTH_M / 2, BODY_HEIGHT_M / 2, BODY_LENGTH_M / 2]}
-        massProperties={rigidBodyMassProperties}
+        position={colliderPosition}
+        args={colliderArgs}
+        massProperties={colliderMassProperties}
         friction={VEHICLE_COLLIDER_FRICTION}
         restitution={VEHICLE_COLLIDER_RESTITUTION}
       />
       {modelUrl ? (
         <Suspense fallback={null}>
-          <KenneyCarModel url={modelUrl} wheelPosesRef={wheelPosesRef} groundOffsetM={GROUND_OFFSET_M} />
+          <KenneyCarModel url={modelUrl} config={config} wheelPosesRef={wheelPosesRef} groundOffsetM={-groundDistanceM(config)} />
         </Suspense>
       ) : (
         <>

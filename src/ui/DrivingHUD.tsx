@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { VehicleTelemetry } from '../shared/types';
 
 interface DrivingHUDProps {
+  /** Régime maximal du moteur du véhicule (tr/min) : échelle de la barre de régime. */
+  maxRpm: number;
   telemetry: VehicleTelemetry;
   paused: boolean;
   onPause: () => void;
@@ -16,12 +18,14 @@ const TIRE_LABELS = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière
 // cohérents avec le réglage physique (ambiant 20°C, optimal 85°C) sans y être couplés en dur.
 const tireStatus = (tempC: number) => (tempC < 55 ? 'cold' : tempC > 115 ? 'hot' : 'optimal');
 const REDLINE_SHARE = 0.82;
-const GRIP_LIMIT_PERCENT = 65;
+/** Le glissement de la télémétrie est normalisé : 1 = pic d'adhérence du pneu. Au-delà de 1,15 le pneu glisse franchement. */
+const GRIP_LIMIT_SLIP = 1.15;
 
-export function DrivingHUD({ telemetry, paused, onPause, zoneUnavailable }: DrivingHUDProps) {
+export function DrivingHUD({ maxRpm, telemetry, paused, onPause, zoneUnavailable }: DrivingHUDProps) {
   const [showDetails, setShowDetails] = useState(false);
-  const rpmShare = Math.min(1, telemetry.engineRpm / 6700);
-  const gripPercent = Math.min(100, Math.round(telemetry.slip * 100));
+  const rpmShare = Math.min(1, telemetry.engineRpm / maxRpm);
+  const gripLimit = telemetry.slip > GRIP_LIMIT_SLIP;
+  const gripUsedPercent = Math.min(100, Math.round(telemetry.slip * 100));
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -41,7 +45,7 @@ export function DrivingHUD({ telemetry, paused, onPause, zoneUnavailable }: Driv
         <section className="details-panel" aria-label="Détails du véhicule">
           <h3>Détails</h3>
           <div className="detail-row"><span>Régime</span><b>{Math.round(telemetry.engineRpm).toLocaleString('fr-FR')} tr/min</b></div>
-          <div className="detail-row"><span>Adhérence</span><b className={gripPercent > GRIP_LIMIT_PERCENT ? 'warning' : ''}>{gripPercent > GRIP_LIMIT_PERCENT ? 'Limite' : 'Stable'}</b></div>
+          <div className="detail-row"><span>Adhérence</span><b className={gripLimit ? 'warning' : ''}>{gripLimit ? 'Glisse' : `${gripUsedPercent} % utilisé`}</b></div>
           <div className="detail-row"><span>Roues au sol</span><b>{telemetry.groundedWheels} / 4</b></div>
           <div className="tires">
             {telemetry.tireTemperaturesC.map((tempC, index) => (
@@ -54,7 +58,7 @@ export function DrivingHUD({ telemetry, paused, onPause, zoneUnavailable }: Driv
         </section>
       )}
 
-      {gripPercent > GRIP_LIMIT_PERCENT && <p className="limit-pill" role="status">Adhérence limite</p>}
+      {gripLimit && <p className="limit-pill" role="status">Adhérence limite</p>}
 
       <section className="cluster" aria-label={`Vitesse ${kmh(telemetry.speedMps)} kilomètres par heure, rapport ${telemetry.gear < 0 ? 'arrière' : telemetry.gear}`}>
         <div className="cluster-main">

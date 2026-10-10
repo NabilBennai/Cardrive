@@ -2,12 +2,11 @@ import { useFrame, useLoader } from '@react-three/fiber';
 import { useMemo } from 'react';
 import { Box3, Group, Mesh, Vector3, type Object3D } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { genericVehicle } from '../configs/genericVehicle';
+import type { VehicleConfig } from '../../shared/types';
 import type { WheelPose } from '../physics/useVehiclePhysics';
 
-const { lengthM: PHYSICS_LENGTH_M } = genericVehicle.dimensionsM;
-/** Largeur visuelle maximale visée : un peu au-dessus du collider (1,67 m), les modèles Kenney étant volontairement larges. */
-const MAX_VISUAL_WIDTH_M = 1.9;
+/** Largeur visuelle maximale visée, en multiple de la largeur du collider : les modèles Kenney sont volontairement larges. */
+const MAX_VISUAL_WIDTH_RATIO = 1.14;
 const WHEEL_SUSPENSION_ANCHOR_M = 0.08;
 
 interface WheelRig {
@@ -19,6 +18,7 @@ interface WheelRig {
 
 interface KenneyCarModelProps {
   url: string;
+  config: VehicleConfig;
   wheelPosesRef: React.RefObject<WheelPose[]>;
   /** Hauteur du sol sous l'origine du châssis (négative), identique à celle de la carrosserie procédurale. */
   groundOffsetM: number;
@@ -42,7 +42,7 @@ function matchWheel(root: Object3D, front: boolean, xSign: number): Object3D | n
  * GenericCar. Le modèle est mis à l'échelle (uniforme) pour tenir dans le gabarit du collider
  * Rapier : sa longueur ne dépasse pas celle du châssis physique, sa largeur reste proche.
  */
-export function KenneyCarModel({ url, wheelPosesRef, groundOffsetM }: KenneyCarModelProps) {
+export function KenneyCarModel({ url, config, wheelPosesRef, groundOffsetM }: KenneyCarModelProps) {
   const gltf = useLoader(GLTFLoader, url);
 
   const { root, scale, rigs } = useMemo(() => {
@@ -53,9 +53,9 @@ export function KenneyCarModel({ url, wheelPosesRef, groundOffsetM }: KenneyCarM
 
     const box = new Box3().setFromObject(clone);
     const size = box.getSize(new Vector3());
-    const fit = Math.min(PHYSICS_LENGTH_M / size.z, MAX_VISUAL_WIDTH_M / size.x);
+    const fit = Math.min(config.dimensionsM.lengthM / size.z, (config.dimensionsM.widthM * MAX_VISUAL_WIDTH_RATIO) / size.x);
 
-    const wheelRigs: Array<WheelRig | null> = genericVehicle.wheelMounts.map((mount) => {
+    const wheelRigs: Array<WheelRig | null> = config.wheelMounts.map((mount) => {
       const wheel = matchWheel(clone, mount.front, Math.sign(mount.xM));
       if (!wheel || !wheel.parent) return null;
       const wheelBox = new Box3().setFromObject(wheel);
@@ -68,7 +68,7 @@ export function KenneyCarModel({ url, wheelPosesRef, groundOffsetM }: KenneyCarM
       return { steer, wheel, radiusModelM };
     });
     return { root: clone, scale: fit, rigs: wheelRigs };
-  }, [gltf]);
+  }, [gltf, config]);
 
   // Pas de nettoyage manuel du clone : R3F le détache avec le <primitive>, et en StrictMode (montage/démontage/remontage) un removeFromParent() le ferait disparaître définitivement. gltf.scene, partagé par le cache du loader, n'est jamais modifié.
 
@@ -78,7 +78,7 @@ export function KenneyCarModel({ url, wheelPosesRef, groundOffsetM }: KenneyCarM
       const pose = wheelPosesRef.current[index];
       // Centre de roue physique au-dessus du sol, puis corrigé de l'écart de rayon visuel/physique
       // pour que le bas du pneu reste exactement au sol quelle que soit la taille de la roue du modèle.
-      const centerAboveGroundM = (-WHEEL_SUSPENSION_ANCHOR_M - pose.suspensionM - groundOffsetM) + (rig.radiusModelM * scale - genericVehicle.wheelRadiusM);
+      const centerAboveGroundM = (-WHEEL_SUSPENSION_ANCHOR_M - pose.suspensionM - groundOffsetM) + (rig.radiusModelM * scale - config.wheelRadiusM);
       rig.steer.position.y = centerAboveGroundM / scale;
       rig.steer.rotation.y = pose.steeringRad;
       rig.wheel.rotation.x = pose.spinRad;

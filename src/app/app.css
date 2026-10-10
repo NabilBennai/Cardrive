@@ -178,3 +178,4 @@ kbd { display: inline-grid; min-width: 24px; height: 24px; padding: 0 7px; place
 .circuit-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--muted); font-size: 13px; line-height: 1.35; }
 .circuit-info strong { color: var(--text); font-size: 16px; font-weight: 600; }
 .circuit-round { color: var(--accent); font-size: 12px; font-weight: 500; }
+.car-card-specs { color: var(--muted); font-size: 12px; line-height: 1.35; text-align: center; }

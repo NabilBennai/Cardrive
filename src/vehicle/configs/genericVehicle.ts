@@ -34,7 +34,10 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
     config.directionChangeDelayS,
     config.maximumReverseSpeedMps,
     config.steeringRateRadPerS,
-    config.tireCorneringStiffnessPerRad,
+    config.tirePeakSlipRatio,
+    config.tirePeakSlipAngleRad,
+    config.tireSlidingGripRatio,
+    config.engineInertiaKgM2,
     config.lowSpeedTireDampingNsPerM,
     config.maximumSuspensionForceN,
     config.minimumSuspensionLengthM,
@@ -42,9 +45,6 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
     config.tireOptimalTemperatureC,
     config.tireTemperatureFalloffC,
     config.tireMinGripMultiplier,
-    config.tireThermalMassJPerC,
-    config.tireCoolingWPerC,
-    config.tireCoolingSpeedFactorPerMps,
     ...config.gearRatios,
     ...config.torqueCurve.map((point) => point.rpm),
     ...config.torqueCurve.map((point) => point.torqueNm),
@@ -75,6 +75,8 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
     || !Number.isFinite(config.frontBrakeBias) || config.frontBrakeBias <= 0 || config.frontBrakeBias >= 1
     || !Number.isFinite(config.handbrakeRearGripFactor) || config.handbrakeRearGripFactor <= 0 || config.handbrakeRearGripFactor > 1
     || !Number.isFinite(config.tireMinGripMultiplier) || config.tireMinGripMultiplier <= 0 || config.tireMinGripMultiplier > 1
+    || config.tireSlidingGripRatio < 0.5 || config.tireSlidingGripRatio >= 1
+    || !Number.isFinite(config.tireLoadSensitivity) || config.tireLoadSensitivity < 0 || config.tireLoadSensitivity > 0.3
     || config.drivetrainEfficiency > 1
     || config.downshiftRpm <= config.idleRpm || config.downshiftRpm >= config.upshiftRpm
     || config.upshiftRpm >= config.maximumRpm || config.launchRpm < config.idleRpm || config.launchRpm >= config.upshiftRpm
@@ -118,8 +120,9 @@ const genericVehicleDefinition: VehicleConfig = {
     { rpm: 1_800, torqueNm: 125 },
     { rpm: 3_000, torqueNm: 150 },
     { rpm: 4_250, torqueNm: 160 },
-    { rpm: 5_500, torqueNm: 148 },
-    { rpm: 6_600, torqueNm: 108 },
+    { rpm: 5_500, torqueNm: 152 },
+    { rpm: 6_000, torqueNm: 140 }, // 88 kW à 6 000 tr/min, valeur annoncée
+    { rpm: 6_600, torqueNm: 112 },
   ],
   idleRpm: 900,
   maximumRpm: 6_700,
@@ -137,7 +140,7 @@ const genericVehicleDefinition: VehicleConfig = {
   gearRatios: [3.727, 2.048, 1.321, 0.971, 0.756],
   reverseGearRatio: 3.394,
   finalDriveRatio: 3.938,
-  drivetrainEfficiency: 0.88,
+  drivetrainEfficiency: 0.92,
   engineBrakeTorqueNm: 28,
   launchRpm: 2_000,
   engineResponsePerS: 8,
@@ -148,7 +151,14 @@ const genericVehicleDefinition: VehicleConfig = {
   directionChangeDelayS: 0.3,
   maximumReverseSpeedMps: 8,
   steeringRateRadPerS: 1.4,
-  tireCorneringStiffnessPerRad: 8,
+  // Pneu de route 205/55 R16 sur sol sec : pic de force à ~12 % de glissement longitudinal et ~7,5° de
+  // dérive (≈ 20 × la charge par radian de raideur de dérive), glissement franc à ~82 % du pic.
+  tirePeakSlipRatio: 0.12,
+  tirePeakSlipAngleRad: 0.13,
+  tireSlidingGripRatio: 0.82,
+  tireLoadSensitivity: 0.08,
+  // Moteur 1.6 essence + volant + embrayage.
+  engineInertiaKgM2: 0.12,
   lowSpeedTireDampingNsPerM: 4_600,
   frontBrakeBias: 0.64,
   handbrakeRearGripFactor: 0.6,
@@ -162,12 +172,9 @@ const genericVehicleDefinition: VehicleConfig = {
   // vient de la convection d'air, renforcée par la vitesse. Le grip suit une fenêtre de
   // température optimale, pas un coefficient fixe : pneus froids ou surchauffés glissent.
   ambientTemperatureC: 20,
-  tireOptimalTemperatureC: 85,
+  tireOptimalTemperatureC: 80,
   tireTemperatureFalloffC: 55,
-  tireMinGripMultiplier: 0.6,
-  tireThermalMassJPerC: 11_000,
-  tireCoolingWPerC: 3,
-  tireCoolingSpeedFactorPerMps: 0.12,
+  tireMinGripMultiplier: 0.5,
 };
 
 export const genericVehicle = validateVehicleConfig(genericVehicleDefinition);

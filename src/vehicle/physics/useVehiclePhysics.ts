@@ -1,12 +1,13 @@
 ﻿import { useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import { useLayoutEffect, useMemo, useRef } from 'react';
-import type { VehicleInput, VehicleTelemetry } from '../../shared/types';
-import { genericVehicle } from '../configs/genericVehicle';
+import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types';
 import { VehicleSimulation, type WheelPose } from './VehicleSimulation';
 
 export type { WheelPose } from './VehicleSimulation';
 
 export interface VehiclePhysicsOptions {
+  /** Configuration physique du véhicule (masse, moteur, pneus…) : voir vehicleProfiles.ts. */
+  config: VehicleConfig;
   bodyRef: React.RefObject<RapierRigidBody | null>;
   input: React.RefObject<VehicleInput>;
   telemetryRef: React.RefObject<VehicleTelemetry>;
@@ -19,9 +20,9 @@ export interface VehiclePhysicsOptions {
   onAfterStep?: (telemetry: VehicleTelemetry, body: RapierRigidBody) => void;
 }
 
-export function useVehiclePhysics({ bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep }: VehiclePhysicsOptions) {
+export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep }: VehiclePhysicsOptions) {
   const { rapier } = useRapier();
-  const simulation = useMemo(() => new VehicleSimulation(genericVehicle), []);
+  const simulation = useMemo(() => new VehicleSimulation(config), [config]);
   const telemetryDelay = useRef(0);
   const telemetryCallback = useRef(onTelemetry);
   const afterStepCallback = useRef(onAfterStep);
@@ -45,5 +46,5 @@ export function useVehiclePhysics({ bodyRef, input, telemetryRef, wheelPosesRef,
       telemetryCallback.current(telemetry);
     }
   });
-  return { wheelMounts: genericVehicle.wheelMounts };
+  return { wheelMounts: config.wheelMounts };
 }

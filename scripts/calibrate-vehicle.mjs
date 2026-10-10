@@ -57,6 +57,7 @@ function measure(scenario, fps) {
   let zeroTo100S = null;
   let minimumWorldZSpeedMps = 0;
   let maximumSlip = 0;
+  let maximumLateralM = 0;
   let gearChanges = 0;
   let previousGear = simulation.gear;
   let previousPosition = body.translation();
@@ -87,6 +88,7 @@ function measure(scenario, fps) {
       maximumPitchRad = Math.max(maximumPitchRad, Math.abs(Math.asin(Math.max(-1, Math.min(1, 2 * (rotation.w * rotation.x - rotation.y * rotation.z))))));
       minimumWorldZSpeedMps = Math.min(minimumWorldZSpeedMps, velocity.z);
       maximumSlip = Math.max(maximumSlip, telemetry.slip);
+      maximumLateralM = Math.max(maximumLateralM, Math.abs(position.x));
       if (simulation.gear !== previousGear) gearChanges++;
       previousGear = simulation.gear;
       if (scenario.name === 'freinage-100-kmh' && stopTimeS === null && Math.hypot(velocity.x, velocity.z) < 0.15) {
@@ -101,7 +103,7 @@ function measure(scenario, fps) {
   const result = { scenario: scenario.name, fps, steps, pathM, minimumHeightM, maximumHeightM,
     maximumSpeedKmh: maximumSpeedMps * 3.6, maximumRollDeg: maximumRollRad * 180 / Math.PI,
     maximumPitchDeg: maximumPitchRad * 180 / Math.PI,
-    minimumWorldZSpeedMps, maximumSlip, gearChanges, finalGear: simulation.gear,
+    minimumWorldZSpeedMps, maximumSlip, maximumLateralM, gearChanges, finalGear: simulation.gear,
     stopTimeS, stopDistanceM, zeroTo100S, position: body.translation(), velocity: body.linvel(),
     finalRpm: simulation.rpm, groundedWheels: telemetry.groundedWheels,
     persistentForce: body.userForce(), persistentTorque: body.userTorque() };
@@ -136,7 +138,7 @@ const checks = {
   sustainedBoundedReverse: at60('recul').finalGear === -1 && at60('recul').velocity.z < -2
     && at60('recul').maximumSpeedKmh <= config.maximumReverseSpeedMps * 3.6 + 0.5,
   directionChange: at60('recul-vers-avant').finalGear > 0 && at60('recul-vers-avant').velocity.z > 2,
-  turningStable: Math.abs(at60('virage').position.x) > 20 && at60('virage').maximumRollDeg < 10
+  turningStable: at60('virage').maximumLateralM > 15 && at60('virage').maximumRollDeg < 10
     && at60('slalom').maximumRollDeg < 10,
   bumpBounded: at60('bosse').maximumHeightM < 1.2 && at60('bosse').minimumHeightM > 0.5,
   collisionBlocked: at60('collision').position.z < 30,

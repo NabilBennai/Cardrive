@@ -12,6 +12,7 @@ import { CircuitPicker } from './CircuitPicker';
 import { buildCircuitTrack, type CircuitTrack } from '../circuits/circuitGeometry';
 import type { CircuitSource } from '../circuits/f1Circuits2026';
 import { carModelUrl, findCar, loadSelectedCarId, saveSelectedCarId } from '../vehicle/catalog/carCatalog';
+import { vehicleConfigFor } from '../vehicle/configs/vehicleProfiles';
 import { GeoLoadingScreen, type GeoLoadingScreenState } from './GeoLoadingScreen';
 import { GeoLoadError, loadRoadWorld, type LoadedRoadWorld } from './geoOrchestrator';
 import type { DrivingWorld } from './DrivingScene';
@@ -80,6 +81,7 @@ export function App() {
   const [circuitTrack, setCircuitTrack] = useState<CircuitTrack | null>(null);
   const [selectedCarId, setSelectedCarId] = useState(loadSelectedCarId);
   const selectedCar = findCar(selectedCarId);
+  const vehicleConfig = useMemo(() => vehicleConfigFor(selectedCarId), [selectedCarId]);
   const chooseCar = useCallback((id: string) => { setSelectedCarId(id); saveSelectedCarId(id); }, []);
   const [useDemoTrack, setUseDemoTrack] = useState(true);
   const [roadWorld, setRoadWorld] = useState<LoadedRoadWorld | null>(null);
@@ -199,6 +201,7 @@ export function App() {
               onRenderAnchorChange={setRenderAnchor}
               onZoneUnavailable={setZoneUnavailable}
               carModelUrl={carModelUrl(selectedCar)}
+              vehicle={vehicleConfig}
             />
           </Suspense>
         </SceneErrorBoundary>
@@ -253,7 +256,7 @@ export function App() {
         </section>
       )}
 
-      {playing && <DrivingHUD telemetry={telemetry} paused={paused || tabHidden} onPause={pauseGame} zoneUnavailable={!useDemoTrack && zoneUnavailable} />}
+      {playing && <DrivingHUD maxRpm={vehicleConfig.maximumRpm} telemetry={telemetry} paused={paused || tabHidden} onPause={pauseGame} zoneUnavailable={!useDemoTrack && zoneUnavailable} />}
 
       {playing && isTouchDevice && !(paused || tabHidden) && (
         <TouchControls setStick={touchInput.setStick} setHandbrake={touchInput.setHandbrake} />

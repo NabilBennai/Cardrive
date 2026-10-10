@@ -1,4 +1,5 @@
 import { CAR_CATALOG, carPreviewUrl } from '../vehicle/catalog/carCatalog';
+import { summarizeVehicle, vehicleConfigFor } from '../vehicle/configs/vehicleProfiles';
 
 interface CarPickerProps {
   selectedId: string;
@@ -15,11 +16,12 @@ export function CarPicker({ selectedId, onSelect, onBack }: CarPickerProps) {
       </div>
       <div className="screen-body wide">
         <h2>Garage</h2>
-        <p className="lead">Choisissez votre voiture. Seul l’aspect change : tous les modèles se conduisent comme le prototype. Modèles du Car Kit de Kenney (CC0).</p>
+        <p className="lead">Chaque véhicule a sa propre conduite : masse, puissance, adhérence, freinage et transmission dépendent de sa nature. Modèles du Car Kit de Kenney (CC0).</p>
 
         <ul className="car-grid" role="listbox" aria-label="Voitures">
           {CAR_CATALOG.map((car) => {
             const preview = carPreviewUrl(car);
+            const summary = summarizeVehicle(vehicleConfigFor(car.id));
             return (
               <li key={car.id}>
                 <button
@@ -30,6 +32,7 @@ export function CarPicker({ selectedId, onSelect, onBack }: CarPickerProps) {
                 >
                   {preview ? <img src={preview} alt="" loading="lazy" width={96} height={72} /> : <span className="car-card-placeholder">R-01</span>}
                   <span>{car.label}</span>
+                  <span className="car-card-specs">{summary.powerKw} kW · {summary.massKg.toLocaleString('fr-FR')} kg<br />{summary.drive}</span>
                 </button>
               </li>
             );
