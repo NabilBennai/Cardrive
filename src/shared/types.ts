@@ -123,4 +123,10 @@ export interface VehicleConfig {
   tireTemperatureFalloffC: number;
   /** Plancher du facteur d'adhérence lié à la température. */
   tireMinGripMultiplier: number;
+  /** Déportance : surface équivalente Cz·A (m²) ; la force plaquant la voiture au sol vaut ½·ρ·Cz·A·v². 0 pour un véhicule de route. */
+  downforceClAM2: number;
+  /** Part de la déportance appliquée à l'essieu avant (0..1). */
+  downforceFrontShare: number;
+  /** Verrouillage du différentiel de chaque essieu moteur : 0 = ouvert, 1 = bloqué (couple reporté sur la roue la plus lente). */
+  differentialLock: number;
 }

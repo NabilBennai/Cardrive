@@ -49,6 +49,11 @@ export interface VehicleProfile {
   tireSlidingGripRatio: number;
   tireOptimalTemperatureC: number;
   tireLoadSensitivity: number;
+  /** Déportance Cz·A (m²) et part à l'avant ; 0 pour un véhicule de route. */
+  downforceClAM2: number;
+  downforceFrontShare: number;
+  /** Verrouillage du différentiel (0 = ouvert, 1 = bloqué). */
+  differentialLock: number;
 }
 
 /** Puissance du moteur du prototype (kW) autour de 6 000 tr/min : base de calcul de l'échelle de couple. */
@@ -142,6 +147,9 @@ export function deriveVehicleConfig(id: string, displayName: string, p: VehicleP
     handbrakeForceN: p.massKg * GRAVITY * 0.43,
     aerodynamicDragCoefficient: p.dragCoefficient,
     frontalAreaM2: p.frontalAreaM2,
+    downforceClAM2: p.downforceClAM2,
+    downforceFrontShare: p.downforceFrontShare,
+    differentialLock: p.differentialLock,
   });
 }
 
@@ -178,6 +186,9 @@ const DEFAULTS = {
   tireSlidingGripRatio: 0.82,
   tireOptimalTemperatureC: 80,
   tireLoadSensitivity: 0.08,
+  downforceClAM2: 0,
+  downforceFrontShare: 0.45,
+  differentialLock: 0,
 };
 const profile = (p: Omit<VehicleProfile, keyof typeof DEFAULTS> & Partial<typeof DEFAULTS>): VehicleProfile => ({ ...DEFAULTS, ...p });
 
@@ -194,7 +205,7 @@ const PROFILES: Record<string, VehicleProfile> = {
   'sedan-sports': profile({
     massKg: 1550, lengthM: 4.72, widthM: 1.86, heightM: 1.39, wheelbaseM: 2.82, trackWidthM: 1.6,
     powerKw: 330, topSpeedKmh: 270, firstGearOverall: 14, dragCoefficient: 0.3, frontalAreaM2: 2.15, drive: 'rwd',
-    tireGrip: 1.25, brakeG: 1.05, stiffness: 1.35, cogHeightFraction: 0.33, rpmScale: 1.1, shiftDurationS: 0.2, maxSteeringRad: 0.56,
+    differentialLock: 0.35, tireGrip: 1.25, brakeG: 1.05, stiffness: 1.35, cogHeightFraction: 0.33, rpmScale: 1.1, shiftDurationS: 0.2, maxSteeringRad: 0.56,
   }),
   'hatchback-sports': profile({
     massKg: 1250, lengthM: 4.1, widthM: 1.8, heightM: 1.43, wheelbaseM: 2.63, trackWidthM: 1.55,
@@ -228,13 +239,13 @@ const PROFILES: Record<string, VehicleProfile> = {
   race: profile({
     massKg: 800, lengthM: 4.5, widthM: 1.95, heightM: 1.05, wheelbaseM: 3.0, trackWidthM: 1.7,
     powerKw: 650, topSpeedKmh: 340, firstGearOverall: 12, gears: 7, dragCoefficient: 0.6, frontalAreaM2: 1.4, drive: 'rwd',
-    tireGrip: 1.8, brakeG: 1.9, stiffness: 2.0, cogHeightFraction: 0.27, rpmScale: 1.7, shiftDurationS: 0.1, maxSteeringRad: 0.42, steeringRateRadPerS: 2.2,
+    differentialLock: 0.2, tireGrip: 1.35, brakeG: 1.9, stiffness: 2.0, cogHeightFraction: 0.27, downforceClAM2: 2.8, downforceFrontShare: 0.42, rpmScale: 1.7, shiftDurationS: 0.1, maxSteeringRad: 0.42, steeringRateRadPerS: 2.2,
     wheelRadiusM: 0.33, suspensionScale: 0.6, tirePeakSlipAngleRad: 0.1, tireSlidingGripRatio: 0.88, tireOptimalTemperatureC: 95, tireLoadSensitivity: 0.1,
   }),
   'race-future': profile({
     massKg: 900, lengthM: 4.5, widthM: 1.95, heightM: 1.1, wheelbaseM: 3.0, trackWidthM: 1.7,
     powerKw: 700, topSpeedKmh: 380, firstGearOverall: 11.5, gears: 7, dragCoefficient: 0.5, frontalAreaM2: 1.4, drive: 'awd',
-    tireGrip: 2.0, brakeG: 2.1, stiffness: 2.2, cogHeightFraction: 0.26, rpmScale: 1.5, shiftDurationS: 0.08, maxSteeringRad: 0.42, steeringRateRadPerS: 2.4,
+    differentialLock: 0.2, tireGrip: 1.4, brakeG: 2.1, stiffness: 2.2, cogHeightFraction: 0.26, downforceClAM2: 3.0, downforceFrontShare: 0.42, rpmScale: 1.5, shiftDurationS: 0.08, maxSteeringRad: 0.42, steeringRateRadPerS: 2.4,
     wheelRadiusM: 0.33, suspensionScale: 0.6, tirePeakSlipAngleRad: 0.1, tireSlidingGripRatio: 0.88, tireOptimalTemperatureC: 95, tireLoadSensitivity: 0.1,
   }),
   delivery: profile({

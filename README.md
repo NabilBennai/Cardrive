@@ -1,6 +1,6 @@
 # Cardrive
 
-Jeu de conduite 3D dans le navigateur. On roule sur une piste d'essai, sur les 24 circuits de Formule 1 de la saison 2026, ou dans n'importe quelle ville du monde grâce aux routes d'OpenStreetMap. Sur circuit : contre-la-montre avec records et fantôme, ou course contre des pilotes automatiques. Chaque véhicule du catalogue (18) a sa propre physique : masse, puissance, adhérence des pneus, freinage, transmission.
+Jeu de conduite 3D dans le navigateur. On roule sur une piste d'essai, sur les 24 circuits de Formule 1 de la saison 2026, ou dans n'importe quelle ville du monde grâce aux routes d'OpenStreetMap. Sur circuit : contre-la-montre avec records et fantôme, ou course contre des pilotes automatiques. Chaque véhicule du catalogue (18) a sa propre physique : masse, puissance, adhérence des pneus selon la surface (asphalte, gravier, herbe), freinage, transmission (différentiel, contrôle de traction réglable), déportance des monoplaces.
 
 Stack : Vite, React 19, TypeScript strict, three.js via React Three Fiber, Rapier (WebAssembly), Vitest.
 

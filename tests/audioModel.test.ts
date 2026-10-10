@@ -128,3 +128,15 @@ describe('effects', () => {
     expect(smoothstep(0, 1, 0.5)).toBe(0.5);
   });
 });
+
+describe('roulement sur sol meuble', () => {
+  it('est plus fort et plus grave sur gravier ou herbe que sur asphalte', async () => {
+    const { rollingNoiseParams } = await import('../src/audio/audioModel');
+    const road = rollingNoiseParams(20, 4, 0);
+    const gravel = rollingNoiseParams(20, 4, 1);
+    expect(gravel.gain).toBeGreaterThan(road.gain * 1.5);
+    expect(gravel.hz).toBeLessThan(road.hz);
+    expect(rollingNoiseParams(20, 4).gain).toBe(road.gain);
+    expect(rollingNoiseParams(20, 4, 5).gain).toBe(gravel.gain);
+  });
+});

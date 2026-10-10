@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { buildCircuitTrack, type CircuitTrack } from '../src/circuits/circuitGeometry';
 import { buildCircuitLayout } from '../src/circuits/circuitMesh';
 import { F1_CIRCUITS_2026 } from '../src/circuits/f1Circuits2026';
+import { createCircuitSurface } from '../src/race/circuitSurface';
 import { AiDriver, aiProfileFor } from '../src/race/driverAi';
 import { RaceTracker } from '../src/race/raceModel';
 import { buildRaceField } from '../src/race/raceSetup';
@@ -21,6 +22,11 @@ const dt = VEHICLE_FIXED_STEP_S;
 const HOLD = { throttle: 0, brake: 0, steering: 0, handbrake: 1 };
 
 beforeAll(async () => { await RAPIER.init(); });
+
+function withSurface(simulation: VehicleSimulation, track: CircuitTrack): VehicleSimulation {
+  simulation.setSurfaceProvider(createCircuitSurface(track));
+  return simulation;
+}
 
 function circuit(id: string): CircuitTrack {
   const source = F1_CIRCUITS_2026.find((c) => c.id === id);
@@ -53,7 +59,7 @@ function simulateRace(circuitId: string, carId: string, rivals: number, laps: nu
       .setMassProperties(mass.mass, mass.centerOfMass, mass.principalAngularInertia, mass.angularInertiaLocalFrame)
       .setFriction(VEHICLE_COLLIDER_FRICTION).setRestitution(VEHICLE_COLLIDER_RESTITUTION), body);
     return {
-      id: entry.id, body, simulation: new VehicleSimulation(config), slip: 0, stuck: new StuckDetector(), respawns: 0,
+      id: entry.id, body, simulation: withSurface(new VehicleSimulation(config), track), slip: 0, stuck: new StuckDetector(), respawns: 0,
       driver: new AiDriver(track.centerline, track.lengthM, aiProfileFor(config, entry.skill)),
     };
   });

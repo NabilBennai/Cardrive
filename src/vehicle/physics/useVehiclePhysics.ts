@@ -3,7 +3,8 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types';
 import { perfStats } from '../../debug/perfStats';
 import { markPhysicsStep } from './stepClock';
-import { VehicleSimulation, type WheelPose } from './VehicleSimulation';
+import type { SurfaceProvider } from './surfaces';
+import { VehicleSimulation, type TractionControl, type WheelPose } from './VehicleSimulation';
 
 export type { WheelPose } from './VehicleSimulation';
 
@@ -25,9 +26,13 @@ export interface VehiclePhysicsOptions {
    * adverses ne doivent pas y toucher, sinon l'intervalle mesuré entre deux pas devient celui qui sépare deux voitures.
    */
   drivesClock?: boolean;
+  /** Surface sous chaque roue (circuits) ; absent : asphalte partout. */
+  surfaceAt?: SurfaceProvider;
+  /** Contrôle de traction ; absent : désactivé. */
+  tractionControl?: TractionControl;
 }
 
-export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true }: VehiclePhysicsOptions) {
+export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep, drivesClock = true, surfaceAt, tractionControl = 'off' }: VehiclePhysicsOptions) {
   const { rapier } = useRapier();
   const simulation = useMemo(() => new VehicleSimulation(config), [config]);
   const telemetryDelay = useRef(0);
@@ -35,6 +40,8 @@ export function useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelP
   const afterStepCallback = useRef(onAfterStep);
   useLayoutEffect(() => { telemetryCallback.current = onTelemetry; }, [onTelemetry]);
   useLayoutEffect(() => { afterStepCallback.current = onAfterStep; }, [onAfterStep]);
+  useLayoutEffect(() => { simulation.setSurfaceProvider(surfaceAt ?? null); }, [simulation, surfaceAt]);
+  useLayoutEffect(() => { simulation.setTractionControl(tractionControl); }, [simulation, tractionControl]);
   useLayoutEffect(() => {
     simulation.reset();
     wheelPosesRef.current = simulation.wheelPoses;

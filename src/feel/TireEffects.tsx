@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import type { RapierRigidBody } from '@react-three/rapier';
 import { useEffect, useMemo, useRef } from 'react';
 import { BufferAttribute, BufferGeometry, DoubleSide, DynamicDrawUsage, MeshBasicMaterial } from 'three';
+import { SURFACES } from '../vehicle/physics/surfaces';
 import type { WheelPose } from '../vehicle/physics/VehicleSimulation';
 import { impactChannel, originShiftChannel } from './feelBus';
 import { skidMarkAlpha, smokeRatePerSecond, sparkCount } from './feelMath';
@@ -11,6 +12,10 @@ import { SkidBuffer } from './SkidBuffer';
 
 const SMOKE_CAPACITY = 240;
 const SPARK_CAPACITY = 160;
+const DUST_CAPACITY = 320;
+/** Vitesse (m/s) au-dessous de laquelle une roue sur sol meuble ne soulève rien, et plafond d'émission (particules par seconde et par roue). */
+const DUST_MIN_SPEED_MPS = 3;
+const DUST_MAX_RATE = 38;
 const SKID_QUADS = 6_000;
 /** Hauteur (m) des traces au-dessus du point de contact : au-dessus de l'asphalte et des vibreurs (≈ 1,6 cm), sans flotter visiblement. */
 const SKID_LIFT_M = 0.03;
@@ -57,6 +62,39 @@ export function TireSmoke({ wheelPosesRef, bodyRef, paused }: TireEffectsProps) 
   });
 
   return <ParticleLayer pool={pool} color="#d6d8d4" />;
+}
+
+/** Poussière soulevée par les roues sur un sol meuble (gravier, herbe sèche) : plus on va vite, plus il y en a. */
+export function OffRoadDust({ wheelPosesRef, bodyRef, paused }: TireEffectsProps) {
+  const pool = useMemo(() => new ParticlePool(DUST_CAPACITY, { gravityY: 0.2, drag: 1.6, fadeIn: 0.15 }), []);
+  const carry = useRef<number[]>([]);
+  useEffect(() => originShiftChannel.subscribe((shift) => pool.shift(shift.dx, shift.dy, shift.dz)), [pool]);
+
+  useFrame((_, delta) => {
+    if (paused) return;
+    const dt = Math.min(delta, MAX_STEP_S);
+    const poses = wheelPosesRef.current;
+    const body = bodyRef.current;
+    if (poses && body) {
+      const velocity = body.linvel();
+      const speed = Math.hypot(velocity.x, velocity.z);
+      poses.forEach((pose, index) => {
+        const loose = pose.grounded && SURFACES[pose.surface].loose && speed > DUST_MIN_SPEED_MPS;
+        carry.current[index] = (carry.current[index] ?? 0) + (loose ? Math.min(DUST_MAX_RATE, speed * 1.4) * dt : 0);
+        while (carry.current[index] >= 1) {
+          carry.current[index] -= 1;
+          pool.spawn({
+            x: pose.contactX + rand(-0.15, 0.15), y: pose.contactY + 0.1, z: pose.contactZ + rand(-0.15, 0.15),
+            vx: velocity.x * 0.25 + rand(-0.7, 0.7), vy: rand(0.4, 1.1), vz: velocity.z * 0.25 + rand(-0.7, 0.7),
+            life: rand(0.8, 1.5), sizeStart: rand(0.3, 0.6), sizeEnd: rand(1.8, 2.8), alpha: 0.3,
+          });
+        }
+      });
+    }
+    pool.update(dt);
+  });
+
+  return <ParticleLayer pool={pool} color="#a39b7a" />;
 }
 
 /** Étincelles projetées à l'arrière du point d'impact lors d'un choc (voir sparkCount : rien pour un contact léger). */
@@ -134,6 +172,7 @@ export function TireEffects(props: TireEffectsProps) {
     <>
       <SkidMarks wheelPosesRef={props.wheelPosesRef} paused={props.paused} />
       <TireSmoke {...props} />
+      <OffRoadDust {...props} />
       <ImpactSparks paused={props.paused} />
     </>
   );

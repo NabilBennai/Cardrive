@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { perfStats } from '../debug/perfStats';
 import { impactChannel } from '../feel/feelBus';
 import type { VehicleConfig, VehicleTelemetry } from '../shared/types';
+import { SURFACES } from '../vehicle/physics/surfaces';
+import type { WheelPose } from '../vehicle/physics/VehicleSimulation';
 import { impactIntensity } from './audioModel';
 import { getGameAudio } from './GameAudio';
 import { soundProfileFor } from './soundProfiles';
@@ -17,6 +19,8 @@ const DEBUG_PUBLISH_EVERY_FRAMES = 6;
 interface AudioDriverProps {
   bodyRef: React.RefObject<RapierRigidBody | null>;
   telemetryRef: React.RefObject<VehicleTelemetry>;
+  /** Poses de roues du solveur : donnent la surface sous chaque roue. */
+  wheelPosesRef: React.RefObject<WheelPose[] | null>;
   vehicle: VehicleConfig;
   /** Identifiant du catalogue (détermine le caractère du moteur) ; null pour le prototype. */
   carId: string | null;
@@ -29,7 +33,7 @@ interface AudioDriverProps {
  * les chocs (variation brutale de vitesse du châssis en un pas physique) qu'il publie sur le bus de ressenti pour les sons,
  * les étincelles et le tremblement de caméra. Ne rend rien.
  */
-export function AudioDriver({ bodyRef, telemetryRef, vehicle, carId, paused, respawnVersion }: AudioDriverProps) {
+export function AudioDriver({ bodyRef, telemetryRef, wheelPosesRef, vehicle, carId, paused, respawnVersion }: AudioDriverProps) {
   const audio = getGameAudio();
   const profile = useMemo(() => soundProfileFor(carId), [carId]);
   const previousVelocity = useRef<{ x: number; y: number; z: number } | null>(null);
@@ -69,9 +73,13 @@ export function AudioDriver({ bodyRef, telemetryRef, vehicle, carId, paused, res
   useFrame(() => {
     const telemetry = telemetryRef.current;
     if (!telemetry) return;
+    const poses = wheelPosesRef.current ?? [];
+    const grounded = poses.filter((pose) => pose.grounded);
+    const looseShare = grounded.length > 0 ? grounded.filter((pose) => SURFACES[pose.surface].loose).length / grounded.length : 0;
+    perfStats.looseShare = looseShare;
     audio.update({
       rpm: telemetry.engineRpm, idleRpm: vehicle.idleRpm, maxRpm: vehicle.maximumRpm, throttle: telemetry.throttle, gear: telemetry.gear,
-      speedMps: telemetry.speedMps, slip: telemetry.slip, groundedWheels: telemetry.groundedWheels,
+      speedMps: telemetry.speedMps, slip: telemetry.slip, groundedWheels: telemetry.groundedWheels, looseShare,
     }, profile);
     frames.current += 1;
     if (frames.current % DEBUG_PUBLISH_EVERY_FRAMES === 0) perfStats.audio = audio.debug();

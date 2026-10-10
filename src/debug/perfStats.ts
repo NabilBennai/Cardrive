@@ -62,6 +62,8 @@ export const perfStats = {
   /** Durée de construction d'un chunk (graphes de routes, bâtiments, eau) en ms : sur le thread principal, donc visible en saccade. */
   chunkBuildMs: new RollingWindow(WINDOW_FRAMES),
   /** Son : état du contexte audio, fréquence du moteur, niveau de sortie. Alimenté par AudioDriver. */
+  /** Part (0..1) des roues au sol sur un sol meuble (gravier, herbe). Alimenté par AudioDriver. */
+  looseShare: 0,
   audio: { state: 'idle', fundamentalHz: 0, engineGain: 0, squealGain: 0, levelDb: -120 } as { state: string; fundamentalHz: number; engineGain: number; squealGain: number; levelDb: number },
   /** Compteurs du monde streamé, mis à jour par useChunkStreamer et useFloatingOrigin. */
   world: { activeChunks: 0, failedChunks: 0, recenters: 0, chunkCrossings: 0, recenterJumpM: 0, steadyJumpM: 0, vehicleWorldXM: 0 },
@@ -107,6 +109,7 @@ export interface PerfSnapshot {
   steadyJumpM: number;
   /** Position est-ouest du véhicule (m) dans le repère MONDE (ancre du lieu choisi), indépendante des recentrages. */
   vehicleWorldXM: number;
+  looseShare: number;
   audioState: string;
   engineHz: number;
   squealGain: number;
@@ -126,6 +129,7 @@ export function takeSnapshot(): PerfSnapshot {
     vehicleSolverAverageMs: perfStats.vehicleSolverMs.average(),
     ...perfStats.scene,
     ...perfStats.world,
+    looseShare: perfStats.looseShare,
     audioState: perfStats.audio.state,
     engineHz: perfStats.audio.fundamentalHz,
     squealGain: perfStats.audio.squealGain,
@@ -155,6 +159,7 @@ export function resetPerfStats() {
   perfStats.vehicleSolverMs.clear();
   perfStats.chunkBuildMs.clear();
   perfStats.audio = { state: 'idle', fundamentalHz: 0, engineGain: 0, squealGain: 0, levelDb: -120 };
+  perfStats.looseShare = 0;
   perfStats.world = { activeChunks: 0, failedChunks: 0, recenters: 0, chunkCrossings: 0, recenterJumpM: 0, steadyJumpM: 0, vehicleWorldXM: 0 };
   perfStats.scene = { triangles: 0, drawCalls: 0, geometries: 0, textures: 0, colliders: 0, bodies: 0 };
 }

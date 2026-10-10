@@ -62,7 +62,7 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
     || config.torqueCurve.some((point, index, curve) => index > 0 && point.rpm <= curve[index - 1].rpm)) {
     throw new Error(`La courbe de couple de ${config.id} doit être triée par régime croissant.`);
   }
-  const nonnegative = [config.engineBrakeTorqueNm, config.steeringReductionPerMps,
+  const nonnegative = [config.downforceClAM2, config.engineBrakeTorqueNm, config.steeringReductionPerMps,
     config.aerodynamicDragCoefficient, config.rollingResistanceCoefficient, config.linearDamping, config.angularDamping];
   if (!Number.isFinite(config.idleRpm) || !Number.isFinite(config.maximumRpm)
     || config.idleRpm <= 0 || config.maximumRpm <= config.idleRpm
@@ -78,6 +78,8 @@ export function validateVehicleConfig(config: VehicleConfig): VehicleConfig {
     || config.tireSlidingGripRatio < 0.5 || config.tireSlidingGripRatio >= 1
     || !Number.isFinite(config.tireLoadSensitivity) || config.tireLoadSensitivity < 0 || config.tireLoadSensitivity > 0.3
     || config.drivetrainEfficiency > 1
+    || config.downforceFrontShare < 0 || config.downforceFrontShare > 1
+    || !(config.differentialLock >= 0 && config.differentialLock <= 1)
     || config.downshiftRpm <= config.idleRpm || config.downshiftRpm >= config.upshiftRpm
     || config.upshiftRpm >= config.maximumRpm || config.launchRpm < config.idleRpm || config.launchRpm >= config.upshiftRpm
     || config.minimumSuspensionLengthM >= config.suspensionRestLengthM) {
@@ -178,6 +180,9 @@ const genericVehicleDefinition: VehicleConfig = {
   tireOptimalTemperatureC: 80,
   tireTemperatureFalloffC: 55,
   tireMinGripMultiplier: 0.5,
+  downforceClAM2: 0,
+  downforceFrontShare: 0.45,
+  differentialLock: 0,
 };
 
 export const genericVehicle = validateVehicleConfig(genericVehicleDefinition);

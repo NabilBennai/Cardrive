@@ -10,11 +10,12 @@ import { RaceDriver, type RaceSnapshot } from '../race/RaceDriver';
 import type { LapTimerEvent } from '../race/lapTimer';
 import type { Ghost } from '../race/ghost';
 import type { GridSlot } from '../race/grid';
+import { createCircuitSurface } from '../race/circuitSurface';
 import { OpponentCar, type OpponentSpec } from '../race/OpponentCar';
 import { PlayerAutopilot } from '../race/PlayerAutopilot';
 import { RaceDirector, type RaceState } from '../race/RaceDirector';
 import { TireEffects } from '../feel/TireEffects';
-import type { WheelPose } from '../vehicle/physics/VehicleSimulation';
+import type { TractionControl, WheelPose } from '../vehicle/physics/VehicleSimulation';
 import { FollowingSun } from './FollowingSun';
 import { CircuitScene } from '../circuits/CircuitScene';
 import type { CircuitTrack } from '../circuits/circuitGeometry';
@@ -59,6 +60,8 @@ interface DrivingSceneProps {
     onSnapshot: (snapshot: RaceSnapshot) => void;
     onEvent: (event: LapTimerEvent) => void;
   };
+  /** Contrôle de traction du joueur (aide à la conduite). */
+  tractionControl?: TractionControl;
   /** Crochet de test (`?autopilot`) : le pilote automatique conduit la voiture du joueur sur un circuit. */
   autopilot?: boolean;
   /** Course contre des adversaires pilotés par l'IA (circuits uniquement). */
@@ -72,11 +75,13 @@ interface DrivingSceneProps {
 }
 
 export function DrivingScene({
-  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot,
+  input, bodyRef, telemetryRef, paused, respawnVersion, onTelemetry, world, onRenderAnchorChange, onZoneUnavailable, carModelUrl, vehicle, carId, cameraEffects, race, field, autopilot, tractionControl,
 }: DrivingSceneProps) {
   // Poses de roues du solveur, partagées avec les effets de pneus (fumée, traces).
   const wheelPosesRef = useRef<WheelPose[] | null>(null);
   // Course : corps des adversaires (pour le chef de course), signal de départ et point de reprise du joueur.
+  // Sur circuit, l'herbe et le gravier hors de la piste adhèrent moins que l'asphalte.
+  const playerSurface = useMemo(() => (world.kind === 'circuit' ? createCircuitSurface(world.track) : undefined), [world]);
   const goRef = useRef({ go: false });
   const playerRespawnPoseRef = useRef<VehicleSpawnPose | null>(null);
   const opponentBodies = useMemo(() => (field ? field.opponents.map((opponent) => ({ id: opponent.id, bodyRef: createRef<RapierRigidBody>() })) : []), [field]);
@@ -137,11 +142,13 @@ export function DrivingScene({
             config={vehicle}
             wheelPosesOutRef={wheelPosesRef}
             respawnPoseRef={field ? playerRespawnPoseRef : undefined}
+            surfaceAt={playerSurface}
+            tractionControl={tractionControl}
           />
           <FloatingOriginApplier origin={floatingOrigin} />
           <ChaseCamera bodyRef={bodyRef} snapVersion={respawnVersion} effects={cameraEffects} />
           <TireEffects wheelPosesRef={wheelPosesRef} bodyRef={bodyRef} paused={paused} />
-          <AudioDriver bodyRef={bodyRef} telemetryRef={telemetryRef} vehicle={vehicle} carId={carId} paused={paused} respawnVersion={respawnVersion} />
+          <AudioDriver bodyRef={bodyRef} telemetryRef={telemetryRef} wheelPosesRef={wheelPosesRef} vehicle={vehicle} carId={carId} paused={paused} respawnVersion={respawnVersion} />
           {world.kind === 'circuit' && race && (
             <RaceDriver track={world.track} bodyRef={bodyRef} respawnVersion={respawnVersion} referenceProfileS={race.referenceProfileS} ghost={race.ghost} ghostHeightM={vehicleSpawnHeightM(vehicle) * 0.6} onLapGhost={race.onLapGhost} onSnapshot={race.onSnapshot} onEvent={race.onEvent} />
           )}

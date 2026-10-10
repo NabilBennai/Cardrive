@@ -7,6 +7,7 @@ import { headingToQuaternion, vehicleSpawnHeightM } from '../vehicle/physics/veh
 import { headingOfRotation } from './bodyPose';
 import { AiDriver, aiProfileFor } from './driverAi';
 import type { GridSlot } from './grid';
+import { createCircuitSurface } from './circuitSurface';
 import { StuckDetector } from './stuckDetector';
 import { TrackProjector } from './trackProjector';
 import { centerlinePoseAt } from './trackPose';
@@ -54,6 +55,7 @@ export function OpponentCar({ spec, track, config, modelUrl, bodyRef, goRef }: O
   const driver = useMemo(() => new AiDriver(track.centerline, track.lengthM, aiProfileFor(config, spec.skill)), [track, config, spec.skill]);
   const projector = useMemo(() => new TrackProjector(track.centerline, track.lengthM), [track]);
   const stuck = useMemo(() => new StuckDetector(), []);
+  const surfaceAt = useMemo(() => createCircuitSurface(track), [track]);
   const spawnPose = useMemo<VehicleSpawnPose>(() => ({
     position: { x: spec.slot.xM, y: vehicleSpawnHeightM(config), z: spec.slot.zM },
     rotation: headingToQuaternion(spec.slot.headingRad),
@@ -95,6 +97,7 @@ export function OpponentCar({ spec, track, config, modelUrl, bodyRef, goRef }: O
       config={config}
       drivesClock={false}
       respawnPoseRef={respawnPoseRef}
+      surfaceAt={surfaceAt}
     />
   );
 }

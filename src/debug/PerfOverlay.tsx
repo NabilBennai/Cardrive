@@ -45,6 +45,7 @@ export function PerfOverlay({ visible }: { visible: boolean }) {
       {row('Chunks actifs · échec · franchis · recentrages', `${snapshot.activeChunks} · ${snapshot.failedChunks} · ${snapshot.chunkCrossings} · ${snapshot.recenters}`, undefined, 'chunks')}
       {row('Génération de chunk moy. · max', `${format(snapshot.chunkBuildAverageMs)} · ${format(snapshot.chunkBuildMaxMs)} ms`, 'chunks', 'chunk-build')}
       {row('Saut caméra : recentrage · normal', `${format(snapshot.recenterJumpM, 2)} · ${format(snapshot.steadyJumpM, 2)} m`, undefined, 'jump')}
+      {row('Sol meuble (gravier, herbe)', `${Math.round(snapshot.looseShare * 100)} % des roues`, undefined, 'surface')}
       {row('Son : état · moteur · crissement · niveau', `${snapshot.audioState} · ${format(snapshot.engineHz, 0)} Hz · ${format(snapshot.squealGain, 2)} · ${snapshot.audioLevelDb <= -100 ? '−∞' : format(snapshot.audioLevelDb, 0)} dB`, undefined, 'audio')}
       {row('Position monde (est)', `${format(snapshot.vehicleWorldXM, 0)} m`, undefined, 'world-x')}
       {heap && row('Mémoire JS', `${format(heap.usedMb, 0)} / ${format(heap.limitMb, 0)} Mo`)}

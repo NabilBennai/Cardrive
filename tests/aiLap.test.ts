@@ -4,7 +4,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { buildCircuitTrack, type CircuitTrack } from '../src/circuits/circuitGeometry';
 import { buildCircuitLayout } from '../src/circuits/circuitMesh';
 import { F1_CIRCUITS_2026 } from '../src/circuits/f1Circuits2026';
-import { AiDriver, aiProfileFor, buildSpeedPlan } from '../src/race/driverAi';
+import { createCircuitSurface } from '../src/race/circuitSurface';
+import { AiDriver, aiProfileFor, brakeDecelAt, buildSpeedPlan } from '../src/race/driverAi';
 import { LapTimer, type LapTimerEvent } from '../src/race/lapTimer';
 import { TrackProjector } from '../src/race/trackProjector';
 import type { VehicleConfig } from '../src/shared/types';
@@ -43,6 +44,7 @@ function runLaps(track: CircuitTrack, config: VehicleConfig, laps: number, maxSi
     .setMassProperties(mass.mass, mass.centerOfMass, mass.principalAngularInertia, mass.angularInertiaLocalFrame)
     .setFriction(VEHICLE_COLLIDER_FRICTION).setRestitution(VEHICLE_COLLIDER_RESTITUTION), body);
   const simulation = new VehicleSimulation(config);
+  simulation.setSurfaceProvider(createCircuitSurface(track));
   const idle = { throttle: 0, brake: 0, steering: 0, handbrake: 0 };
   for (let i = 0; i < 120; i += 1) { simulation.step(world, RAPIER, body, idle); world.step(); }
 
@@ -92,7 +94,7 @@ describe('plan de vitesse du pilote automatique', () => {
     const ds = track.lengthM / plan.length;
     for (let i = 0; i < plan.length; i += 1) {
       const next = plan[(i + 1) % plan.length];
-      expect(plan[i] * plan[i]).toBeLessThanOrEqual(next * next + 2 * profile.brakeDecelMps2 * ds + 1e-6);
+      expect(plan[i] * plan[i]).toBeLessThanOrEqual(next * next + 2 * brakeDecelAt(profile, next) * ds + 1e-6);
     }
   });
 });
@@ -107,11 +109,12 @@ describe('tour complet piloté, avec le vrai solveur', () => {
   ])('%s (%s) : enchaîne des tours valides, réguliers, sans sortir de la piste', (circuitId, carId, lapCount) => {
     const track = circuit(circuitId);
     const config = vehicleConfigFor(carId);
-    const { events, maxLateral, maxSpeed, elapsed, trace } = runLaps(track, config, lapCount, 900);
+    const { events, maxLateral, maxSpeed, elapsed } = runLaps(track, config, lapCount, 900);
     const laps = events.filter((e): e is Extract<LapTimerEvent, { type: 'lap' }> => e.type === 'lap');
     const times = laps.map((l) => (l.valid ? l.lapS.toFixed(1) : `invalide(${l.reason})`));
     console.info(`${track.name} (${config.id}, ${(track.lengthM / 1000).toFixed(2)} km) : tours ${times.join(' · ')} ; vitesse max ${(maxSpeed * 3.6).toFixed(0)} km/h ; écart max ${maxLateral.toFixed(1)} m ; ${elapsed.toFixed(0)} s simulées`);
-    if (process.env.AI_TRACE) console.info(trace.join(String.fromCharCode(10)));
+    if (process.env.AI_TRACE) fs.appendFileSync(`${process.env.TEMP}/ai-summary.txt`, `${track.name} (${config.id}) : ${times.join(' · ')} ; vmax ${(maxSpeed * 3.6).toFixed(0)} km/h ; écart max ${maxLateral.toFixed(1)} m
+`);
     expect(laps.length).toBeGreaterThanOrEqual(lapCount);
     expect(laps.every((l) => l.valid)).toBe(true);
     const valid = laps.filter((l): l is Extract<LapTimerEvent, { type: 'lap'; valid: true }> => l.valid);

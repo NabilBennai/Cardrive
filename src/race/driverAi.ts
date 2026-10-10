@@ -12,6 +12,8 @@ import type { VehicleConfig, VehicleInput } from '../shared/types.ts';
 import { TrackProjector } from './trackProjector.ts';
 
 const GRAVITY = 9.81;
+const AIR_DENSITY_KG_M3 = 1.225;
+const AERO_GRIP_EFFECTIVENESS = 0.7;
 /** Fraction de l'adhérence latérale estimée réellement utilisée : < 1 laisse de la marge face aux erreurs de modèle. */
 const BASE_GRIP_USE = 0.7;
 const BRAKE_USE = 0.65;
@@ -22,14 +24,21 @@ const MAX_PLAN_SPEED_MPS = 100;
  * solveur actuel : mesuré sur Suzuka, la monoplace thermique (« race ») décroche au-delà de ≈ 200 km/h (l'arrière part sans
  * que le braquage suffise) alors que la monoplace électrique reste stable à 315 km/h. À lever quand l'aérodynamique (R-3.4) sera modélisée.
  */
-const STABLE_SPEED_CAP_MPS: Readonly<Record<string, number>> = { 'cardrive-race': 50 };
+const STABLE_SPEED_CAP_MPS: Readonly<Record<string, number>> = {};
 const MIN_PLAN_SPEED_MPS = 6;
 
 export interface AiProfile {
-  /** Accélération latérale tenable en virage (m/s²). */
+  /** Accélération latérale tenable en virage à basse vitesse (m/s²), sans déportance. */
   lateralAccelMps2: number;
-  /** Décélération de freinage utilisable (m/s²). */
+  /** Décélération de freinage utilisable à basse vitesse (m/s²), sans déportance. */
   brakeDecelMps2: number;
+  /** Coefficient d'adhérence exploité en virage et au freinage (sans dimension). */
+  gripCoefficient: number;
+  brakeGripCoefficient: number;
+  /** Limite du freinage par la puissance des freins (m/s²), indépendante de l'adhérence. */
+  brakeForceDecelMps2: number;
+  /** Accélération verticale due à la déportance par (m/s)² : ½·ρ·Cz·A / masse. */
+  downforcePerV2: number;
   maxSpeedMps: number;
   wheelbaseM: number;
   maxSteeringRad: number;
@@ -42,10 +51,17 @@ export interface AiProfile {
  */
 export function aiProfileFor(config: VehicleConfig, skill = 1, gripUse = BASE_GRIP_USE): AiProfile {
   const level = 0.6 + 0.4 * Math.max(0, Math.min(1, skill));
-  const brakeDecel = Math.min(config.serviceBrakeForceN / config.massKg, config.tireGrip * GRAVITY) * BRAKE_USE * level;
+  const brakeForceDecel = config.serviceBrakeForceN / config.massKg * BRAKE_USE * level;
+  const brakeGrip = config.tireGrip * BRAKE_USE * level;
+  // Le grip ne croît pas proportionnellement à la charge (sensibilité du pneu) : on ne compte que 70 % de la déportance.
+  const downforcePerV2 = AERO_GRIP_EFFECTIVENESS * 0.5 * AIR_DENSITY_KG_M3 * config.downforceClAM2 / config.massKg;
   return {
     lateralAccelMps2: config.tireGrip * GRAVITY * gripUse * level,
-    brakeDecelMps2: brakeDecel,
+    brakeDecelMps2: Math.min(brakeForceDecel, brakeGrip * GRAVITY),
+    gripCoefficient: config.tireGrip * gripUse * level,
+    brakeGripCoefficient: brakeGrip,
+    brakeForceDecelMps2: brakeForceDecel,
+    downforcePerV2,
     // Un pilote moins bon n'exploite pas toute la vitesse de pointe : 80 % à 100 % de celle que la traînée autorise.
     maxSpeedMps: Math.min(STABLE_SPEED_CAP_MPS[config.id] ?? MAX_PLAN_SPEED_MPS, dragLimitedTopSpeedMps(config) * (0.8 + 0.2 * Math.max(0, Math.min(1, skill)))),
     wheelbaseM: config.wheelbaseM,
@@ -54,7 +70,16 @@ export function aiProfileFor(config: VehicleConfig, skill = 1, gripUse = BASE_GR
   };
 }
 
-const AIR_DENSITY_KG_M3 = 1.2;
+/** Décélération (m/s²) que le freinage peut tenir à la vitesse v : bornée par les freins et par l'adhérence, qui croît avec la déportance. */
+export function brakeDecelAt(profile: AiProfile, speedMps: number): number {
+  return Math.min(profile.brakeForceDecelMps2, profile.brakeGripCoefficient * (GRAVITY + profile.downforcePerV2 * speedMps * speedMps));
+}
+
+/** Vitesse (m/s) maximale en virage de courbure κ : v²·κ = μ·(g + k·v²), soit v² = μ·g / (κ − μ·k) ; infinie si la déportance suffit. */
+export function cornerSpeedMps(profile: AiProfile, curvature: number): number {
+  const denominator = curvature - profile.gripCoefficient * profile.downforcePerV2;
+  return denominator > 1e-5 ? Math.sqrt(profile.gripCoefficient * GRAVITY / denominator) : Infinity;
+}
 
 /** Vitesse maximale (m/s) limitée par la traînée aérodynamique à pleine puissance : v³ = 2·P·η / (ρ·Cd·A). */
 export function dragLimitedTopSpeedMps(config: VehicleConfig): number {
@@ -77,14 +102,14 @@ export function buildSpeedPlan(centerline: readonly PlanarPoint[], lengthM: numb
   const limit = centerline.map((_, i) => {
     const turn = Math.abs(wrapAngle(heading[(i + k) % n] - heading[(i - k + n) % n]));
     const curvature = turn / (2 * k * ds);
-    const cornerSpeed = curvature > 1e-4 ? Math.sqrt(profile.lateralAccelMps2 / curvature) : Infinity;
+    const cornerSpeed = curvature > 1e-4 ? cornerSpeedMps(profile, curvature) : Infinity;
     return Math.max(MIN_PLAN_SPEED_MPS, Math.min(profile.maxSpeedMps, cornerSpeed));
   });
   // Deux tours de propagation arrière : la limite d'un virage se répercute sur la ligne droite qui le précède, circuit fermé compris.
   for (let pass = 0; pass < 2 * n; pass += 1) {
     const i = (n - 1 - (pass % n) + n) % n;
     const ahead = limit[(i + 1) % n];
-    limit[i] = Math.min(limit[i], Math.sqrt(ahead * ahead + 2 * profile.brakeDecelMps2 * ds));
+    limit[i] = Math.min(limit[i], Math.sqrt(ahead * ahead + 2 * brakeDecelAt(profile, ahead) * ds));
   }
   return limit;
 }

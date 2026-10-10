@@ -1,11 +1,15 @@
 import type { RapierContext, RapierRigidBody } from '@react-three/rapier';
 import { Quaternion, Vector3 } from 'three';
-import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types.ts';
+import type { SurfaceMaterial, VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared/types.ts';
+import { SURFACES, type SurfaceProvider } from './surfaces.ts';
 import {
   stableReferenceSpeedMps, staticWheelLoadN, stepTireThermal, temperatureGripFactor, thermalParamsFor, tireForce,
   type TireForceParams, type TireThermalParams,
 } from './tireModel.ts';
 import { calculateSuspensionForceN, interpolateTorqueNm } from './vehicleMath.ts';
+
+/** Aide à la conduite : contrôle de traction (coupe le couple moteur quand une roue motrice patine). */
+export type TractionControl = 'off' | 'medium' | 'full';
 
 export interface WheelPose {
   xM: number;
@@ -27,6 +31,8 @@ export interface WheelPose {
   contactX: number;
   contactY: number;
   contactZ: number;
+  /** Surface sous la roue au dernier contact (adhérence, résistance au roulement, poussière). */
+  surface: SurfaceMaterial;
 }
 
 const clamp = (value: number, lower: number, upper: number) => Math.max(lower, Math.min(upper, value));
@@ -91,6 +97,22 @@ export class VehicleSimulation {
   private slipReferenceSpeedMps = 0;
   private slipAngleReferenceSpeedMps = 0;
   private ray: InstanceType<RapierContext['rapier']['Ray']> | null = null;
+  private surfaceProvider: SurfaceProvider | null = null;
+  private tractionControl: TractionControl = 'off';
+  /** Facteur (0..1) appliqué au couple moteur par le contrôle de traction, lissé d'un pas à l'autre. */
+  private tractionScale = 1;
+  /** Glissement longitudinal de chaque roue au pas précédent (positif = patinage moteur). */
+  private readonly previousKappa: number[];
+  private readonly drivenAxleCount: number;
+  /** Vitesses de roue au début du pas : le différentiel les lit toutes avant que la boucle n'en modifie aucune (indépendant de l'ordre). */
+  private readonly omegaAtStepStart: number[];
+  /** Pour chaque roue, l'indice de la roue du même essieu (différentiel), ou -1. */
+  private readonly axlePartner: number[];
+  private readonly aeroPoint = new Vector3();
+  private readonly aeroImpulse = new Vector3();
+  /** Position longitudinale (m, repère du châssis) des essieux avant et arrière : points d'application de la déportance. */
+  private readonly frontAxleZM: number;
+  private readonly rearAxleZM: number;
 
   constructor(config: VehicleConfig) {
     this.config = config;
@@ -99,8 +121,16 @@ export class VehicleSimulation {
     this.wheelPoses = config.wheelMounts.map(({ xM, zM }) => ({
       xM, zM, suspensionM: config.suspensionRestLengthM, steeringRad: 0, spinRad: 0, omegaRadPerS: 0,
       temperatureC: config.ambientTemperatureC, carcassTemperatureC: config.ambientTemperatureC,
-      grounded: false, slidingPowerW: 0, contactX: 0, contactY: 0, contactZ: 0,
+      grounded: false, slidingPowerW: 0, contactX: 0, contactY: 0, contactZ: 0, surface: 'asphalt' as SurfaceMaterial,
     }));
+    this.previousKappa = config.wheelMounts.map(() => 0);
+    this.omegaAtStepStart = config.wheelMounts.map(() => 0);
+    this.drivenAxleCount = new Set(config.wheelMounts.filter((wheel) => wheel.driven).map((wheel) => wheel.front)).size;
+    this.axlePartner = config.wheelMounts.map((wheel, index) => config.wheelMounts.findIndex((other, otherIndex) => otherIndex !== index && other.front === wheel.front && other.driven === wheel.driven && Math.sign(other.xM) !== Math.sign(wheel.xM)));
+    const frontMounts = config.wheelMounts.filter((wheel) => wheel.front);
+    const rearMounts = config.wheelMounts.filter((wheel) => !wheel.front);
+    this.frontAxleZM = frontMounts.reduce((sum, wheel) => sum + wheel.zM, 0) / Math.max(1, frontMounts.length);
+    this.rearAxleZM = rearMounts.reduce((sum, wheel) => sum + wheel.zM, 0) / Math.max(1, rearMounts.length);
     this.impulses = config.wheelMounts.map(() => ({ impulse: new Vector3(), point: new Vector3() }));
     const staticLoadN = staticWheelLoadN(config.massKg);
     this.tireParams = {
@@ -112,6 +142,53 @@ export class VehicleSimulation {
       referenceLoadN: staticLoadN,
     };
     this.thermalParams = thermalParamsFor(staticLoadN);
+  }
+
+  /**
+   * Contrôle de traction : si une roue motrice patine au-delà d'un seuil (multiple du glissement au pic), on réduit le couple moteur.
+   * Le facteur chute vite et remonte lentement pour ne pas pomper. « medium » tolère un glissement plus grand que « full ».
+   */
+  private updateTractionControl(driveInput: number, direction: number): number {
+    if (this.tractionControl === 'off' || driveInput <= 0) { this.tractionScale = 1; return 1; }
+    const limit = this.config.tirePeakSlipRatio * (this.tractionControl === 'full' ? 1.2 : 2);
+    let worst = 0;
+    for (let i = 0; i < this.previousKappa.length; i += 1) if (this.config.wheelMounts[i].driven) worst = Math.max(worst, this.previousKappa[i] * direction);
+    const target = worst > limit ? clamp(1 - (worst - limit) * 6 / Math.max(limit, 0.05), 0.12, 1) : 1;
+    this.tractionScale += (target - this.tractionScale) * (target < this.tractionScale ? 0.7 : 0.12);
+    return this.tractionScale;
+  }
+
+  /**
+   * Part du couple moteur reçue par une roue motrice. Différentiel ouvert (verrouillage 0) : parts égales. Avec verrouillage,
+   * le couple de l'essieu est reporté vers la roue la plus lente (celle qui adhère), proportionnellement à l'écart de vitesse.
+   */
+  private drivenTorqueShare(index: number): number {
+    const c = this.config;
+    const axleShare = 1 / Math.max(1, this.drivenAxleCount);
+    const partner = this.axlePartner[index];
+    if (partner < 0 || c.differentialLock <= 0) return axleShare / (partner < 0 ? 1 : 2);
+    const mine = this.omegaAtStepStart[index];
+    const other = this.omegaAtStepStart[partner];
+    const reference = Math.max(2, (Math.abs(mine) + Math.abs(other)) / 2);
+    const bias = clamp((other - mine) / (0.3 * reference), -1, 1);
+    return axleShare * (0.5 + 0.5 * c.differentialLock * bias);
+  }
+
+  private applyDownforce(body: RapierRigidBody, impulseNs: number, axleZM: number) {
+    this.aeroPoint.set(0, 0, axleZM).applyQuaternion(this.rotation).add(this.position);
+    this.aeroImpulse.copy(this.down).multiplyScalar(impulseNs);
+    body.applyImpulseAtPoint(this.aeroImpulse, this.aeroPoint, true);
+  }
+
+  setTractionControl(level: TractionControl) {
+    this.tractionControl = level;
+    if (level === 'off') this.tractionScale = 1;
+  }
+
+  /** Fournit la surface sous chaque roue ; absent : asphalte partout (piste de démo, routes). */
+  setSurfaceProvider(provider: SurfaceProvider | null) {
+    this.surfaceProvider = provider;
+    if (!provider) for (const pose of this.wheelPoses) pose.surface = 'asphalt';
   }
 
   reset() {
@@ -209,8 +286,9 @@ export class VehicleSimulation {
       / (c.maximumReverseSpeedMps * 0.35), 0, 1) : 1;
     const clutchEngaged = this.shiftRemainingS === 0;
     // Couple moteur ramené aux roues, réparti à parts égales entre les roues motrices (différentiel ouvert).
+    const tractionScale = this.updateTractionControl(driveInput, direction);
     const driveWheelTorqueNm = driveAllowed && clutchEngaged && wheelCoupledRpm < c.maximumRpm
-      ? torque * overallRatio * c.drivetrainEfficiency * driveInput * direction * reverseLimiter : 0;
+      ? torque * overallRatio * c.drivetrainEfficiency * driveInput * direction * reverseLimiter * tractionScale : 0;
     const engineBrakeWheelTorqueNm = c.engineBrakeTorqueNm * overallRatio * (1 - driveInput);
     // Inertie du moteur ramenée à chaque roue motrice (embrayage fermé) : c'est elle qui limite la vitesse de montée en régime.
     const reflectedEngineInertia = clutchEngaged ? c.engineInertiaKgM2 * overallRatio * overallRatio / Math.max(1, this.drivenWheelCount) : 0;
@@ -227,6 +305,7 @@ export class VehicleSimulation {
     const wheelMassKg = c.massKg / c.wheelMounts.length;
     const wheelRadiusM = c.wheelRadiusM;
 
+    for (let i = 0; i < this.wheelPoses.length; i += 1) this.omegaAtStepStart[i] = this.wheelPoses[i].omegaRadPerS;
     // Sample every contact before applying any impulse: no dependence on wheel order.
     for (let index = 0; index < c.wheelMounts.length; index += 1) {
       const wheel = c.wheelMounts[index];
@@ -234,7 +313,8 @@ export class VehicleSimulation {
       const pending = this.impulses[index];
       pending.impulse.set(0, 0, 0);
       pose.steeringRad = wheel.front ? -this.steeringRad : 0;
-      const gripFactor = temperatureGripFactor(pose.temperatureC, c.tireOptimalTemperatureC, c.tireTemperatureFalloffC, c.tireMinGripMultiplier);
+      let gripFactor = temperatureGripFactor(pose.temperatureC, c.tireOptimalTemperatureC, c.tireTemperatureFalloffC, c.tireMinGripMultiplier);
+      let rollingFactor = 1;
 
       this.mount.set(wheel.xM, -0.08, wheel.zM).applyQuaternion(this.rotation).add(this.position);
       this.ray.origin.x = this.mount.x;
@@ -249,7 +329,7 @@ export class VehicleSimulation {
       pose.suspensionM = c.suspensionRestLengthM + c.suspensionTravelM;
 
       // Couples appliqués à la roue (hors frein), positifs dans le sens de roulement vers l'avant.
-      const drivenShare = wheel.driven ? 1 / Math.max(1, this.drivenWheelCount) : 0;
+      const drivenShare = wheel.driven ? this.drivenTorqueShare(index) : 0;
       const wheelTorqueNm = driveWheelTorqueNm * drivenShare
         - clamp(pose.omegaRadPerS / SIGN_SMOOTHING_RADPS, -1, 1) * engineBrakeWheelTorqueNm * drivenShare;
       const wheelInertia = c.wheelInertiaKgM2 + (wheel.driven ? reflectedEngineInertia : 0);
@@ -274,6 +354,11 @@ export class VehicleSimulation {
           c.damperNsPerM, -this.contactVelocity.dot(this.normal) / Math.max(0.35, -this.normal.dot(this.down)), c.maximumSuspensionForceN);
         if (load > 0) {
           inContact = true;
+          if (this.surfaceProvider) {
+            pose.surface = this.surfaceProvider(this.point.x, this.point.z, index);
+            gripFactor *= SURFACES[pose.surface].gripFactor;
+            rollingFactor = SURFACES[pose.surface].rollingFactor;
+          }
           groundedWheels += 1;
           pending.point.copy(this.point);
           // Support follows the surface normal, not chassis tilt: a pitched body
@@ -290,6 +375,7 @@ export class VehicleSimulation {
           const slipDenominator = Math.max(Math.abs(vLong), this.slipReferenceSpeedMps);
           const kappa = (pose.omegaRadPerS * wheelRadiusM - vLong) / slipDenominator;
           const alpha = Math.atan2(vLat, Math.max(this.slipAngleReferenceSpeedMps, Math.abs(vLong)));
+          this.previousKappa[index] = kappa;
           const force = tireForce(this.tireParams, kappa, alpha, load, gripFactor);
           // Latéral : à très basse vitesse la dérive n'est pas définie, on amortit la vitesse transversale (stationnement).
           const blend = clamp(Math.abs(vLong) / 3, 0, 1);
@@ -301,7 +387,7 @@ export class VehicleSimulation {
           lateralN = clamp(lateralN, -Math.abs(vLat) * wheelMassKg / dt, Math.abs(vLat) * wheelMassKg / dt);
 
           // Résistance au roulement (hystérésis du pneu) : s'oppose au mouvement, bornée pour ne pas inverser la vitesse.
-          const rollingN = -clamp(vLong / SIGN_SMOOTHING_MPS, -1, 1) * load * c.rollingResistanceCoefficient;
+          const rollingN = -clamp(vLong / SIGN_SMOOTHING_MPS, -1, 1) * load * c.rollingResistanceCoefficient * rollingFactor;
           let longitudinalN = force.fxN;
           // Une force qui freine la voiture ne doit pas la faire repartir en arrière dans le même pas (sauf si le moteur
           // pousse dans le sens opposé à une vitesse parasite : on ne bride jamais un démarrage).
@@ -342,6 +428,7 @@ export class VehicleSimulation {
       }
 
       if (!inContact) {
+        this.previousKappa[index] = 0;
         // Roue en l'air (ou sans charge) : elle tourne librement sous le couple moteur et le frein.
         const freeOmega = pose.omegaRadPerS + dt * wheelTorqueNm / wheelInertia;
         pose.omegaRadPerS = applyBrake(freeOmega, dt * (serviceBrakeTorqueNm + handbrakeTorqueNm) / wheelInertia, 0);
@@ -366,6 +453,13 @@ export class VehicleSimulation {
     const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
     const dragScale = -0.5 * 1.225 * c.aerodynamicDragCoefficient * c.frontalAreaM2 * horizontalSpeed * dt;
     body.applyImpulse({ x: velocity.x * dragScale, y: 0, z: velocity.z * dragScale }, true);
+    // Déportance : ½·ρ·Cz·A·v², plaquant la caisse vers le sol (selon le bas du châssis) aux deux essieux. Les ressorts la transmettent
+    // aux roues : la charge verticale augmente, donc la force maximale du pneu, sans toucher à la masse ni à la suspension.
+    if (c.downforceClAM2 > 0 && horizontalSpeed > 1) {
+      const downforceN = 0.5 * 1.225 * c.downforceClAM2 * horizontalSpeed * horizontalSpeed;
+      this.applyDownforce(body, downforceN * c.downforceFrontShare * dt, this.frontAxleZM);
+      this.applyDownforce(body, downforceN * (1 - c.downforceFrontShare) * dt, this.rearAxleZM);
+    }
     return { speedMps, engineRpm: this.rpm, gear: this.gear,
       slip: maximumNormalizedSlip, groundedWheels,
       throttle: driveAllowed ? driveInput : 0, brake: brakeInput, steering: this.steeringRad / c.maxSteeringRad,

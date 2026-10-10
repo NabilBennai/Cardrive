@@ -15,6 +15,8 @@ export interface GameAudioFrame {
   /** Glissement normalisé de la télémétrie (1 = pic d'adhérence). */
   slip: number;
   groundedWheels: number;
+  /** Part (0..1) des roues au sol qui roulent sur un sol meuble (gravier, herbe). */
+  looseShare: number;
 }
 
 /** Constante de temps (s) du lissage des paramètres : assez courte pour suivre le régime, assez longue pour éviter les « clics ». */
@@ -168,7 +170,7 @@ export class GameAudio {
     this.squealGain.gain.setTargetAtTime(squeal.gain, now, tc);
     this.squealTone.frequency.setTargetAtTime(squeal.hz, now, tc);
     this.squealToneGain.gain.setTargetAtTime(squeal.gain * 0.35, now, tc);
-    const rolling = rollingNoiseParams(frame.speedMps, frame.groundedWheels);
+    const rolling = rollingNoiseParams(frame.speedMps, frame.groundedWheels, frame.looseShare);
     this.rollingFilter.frequency.setTargetAtTime(rolling.hz, now, tc);
     this.rollingGain.gain.setTargetAtTime(rolling.gain, now, tc);
     const wind = windNoiseParams(frame.speedMps);

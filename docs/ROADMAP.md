@@ -181,7 +181,7 @@ Le jeu était muet : c’est ce qui lui retirait le plus de vie. Tout est synth�
 - **Même solveur, mêmes commandes** que le joueur : `AiDriver` produit un `VehicleInput` (accélérateur, frein, volant). Plan de vitesse par virage (v² = a_lat / κ, plafonné par la traînée) propagé vers l’arrière avec le freinage ; poursuite de point ; antipatinage, dosage du frein quand l’adhérence est sollicitée, réduction automatique de la vitesse en virage si la voiture glisse (pneus froids) ; remise en piste d’une voiture bloquée plus de 4 s.
 - Niveau 0..1 : 60-100 % de l’adhérence et du freinage utilisés, 80-100 % de la vitesse de pointe. Écart mesuré (Monza, voiture de sport) : +11 % de temps au tour au niveau le plus bas.
 - Vérifié (tests, vrai solveur et vrais murs) : 17 voitures du catalogue sur Monaco, la plupart aussi sur Suzuka ; 4 circuits en tours multiples, réguliers et valides ; course simulée à 6 voitures avec collisions (tout le monde termine, ordre cohérent avec les niveaux, 0 à 1 remise en piste par voiture).
-- **Limites connues** : (1) pas d’évitement ni de dépassement actif : les voitures roulent sur la ligne centrale et se gênent ou se touchent ; (2) la monoplace thermique (« race ») devient instable au-delà d’environ 200 km/h avec le solveur actuel (l’arrière part sans que le braquage suffise) : le pilote est plafonné à 180 km/h pour elle, la monoplace électrique reste stable à 315 km/h — à reprendre avec l’aérodynamique (R-3.4) ; (3) le tracteur ne boucle pas toujours Monaco sans sortir de la piste ; (4) toutes les voitures ont la carrosserie du joueur (pas de couleurs distinctes) ; (5) coût mesuré pour 5 adversaires non établi en rendu matériel au-delà du scénario e2e (100 img/s plafonné).
+- **Limites connues** : (1) pas d’évitement ni de dépassement actif : les voitures roulent sur la ligne centrale et se gênent ou se touchent ; (2) _résolu en R-3.4 : la monoplace thermique est stable à haute vitesse grâce à la déportance_ ; (3) le tracteur ne boucle pas toujours Monaco sans sortir de la piste ; (4) toutes les voitures ont la carrosserie du joueur (pas de couleurs distinctes) ; (5) coût mesuré pour 5 adversaires non établi en rendu matériel au-delà du scénario e2e (100 img/s plafonné).
 
 ### R-2.5 Départ, drapeaux et classement 🟡
 - Livré : grille de départ à deux files, feux (3 feux, extinction après 0,8 s), faux départ (déplacement > 1,5 m avant l’extinction : +5 s), compte des tours, classement en direct, arrivée au dernier tour, tableau de résultats avec temps (pénalité comprise), « Rejouer » et « Retour au menu ».
@@ -195,28 +195,36 @@ Le jeu était muet : c’est ce qui lui retirait le plus de vie. Tout est synth�
 
 ---
 
-## 6. Phase 3 — Physique avancée
+## 6. Phase 3 — Physique avancée 🟡
 
 Chaque ligne s’appuie sur le solveur actuel, qui a des tests de bout en bout : ajouter le mécanisme **et** son scénario de calibration.
 
-### R-3.1 Surfaces et coefficients — M/L ⬜
-- **Pourquoi** : aujourd’hui l’herbe adhère comme l’asphalte (un seul `tireGrip`).
-- **Approche** : une table de surfaces (`asphalt`, `concrete`, `gravel`, `grass`, `sand`, `ice` : le type `SurfaceMaterial` existe déjà) avec facteur de grip, résistance au roulement et chaleur transmise ; identifier la surface sous chaque roue (userData du collider ou index par triangle ; pour les circuits, distance à la ligne centrale suffit) ; le facteur multiplie la force maximale dans `tireForce`.
-- **Fin** : sortie de piste visiblement plus lente et glissante, bruit et particules adaptés (R-1.2, R-1.4), test : freinage sur herbe ≥ 1,5× plus long que sur asphalte.
+### R-3.1 Surfaces et coefficients ✅ (circuits)
+- Table de surfaces (`surfaces.ts`) : adhérence et résistance au roulement par surface (asphalte 1 / 1, béton 0,95 / 1, gravier 0,55 / 5, herbe 0,5 / 3,5). Le solveur lit la surface sous **chaque roue** (le facteur multiplie la force maximale du pneu).
+- Sur circuit, la surface vient de la distance à la ligne centrale : piste et vibreurs en asphalte, 7 m de gravier (échappatoire), puis herbe. La piste de démo et les routes OpenStreetMap restent en asphalte partout : il n'y a pas encore de donnée de surface par route.
+- Effets : poussière derrière les roues sur sol meuble (proportionnelle à la vitesse), roulement plus bruyant et plus grave, ligne « Sol meuble » dans le panneau F3.
+- Mesuré (prototype, 100 km/h → 0) : **45 m sur asphalte, 69 m sur gravier, 77 m sur herbe** (×1,7) ; test ≥ ×1,5 respecté. Les pilotes automatiques bouclent toujours leurs tours avec les surfaces actives.
+- Vérifié : tests unitaires (freinage, roue libre, surface par roue, découpage piste / gravier / herbe), e2e « Hors piste » (la voiture quitte la piste, 100 % des roues sur sol meuble). **Non évalué visuellement à vitesse** : sur la capture la voiture est arrêtée par le mur et la poussière à peine visible.
+- Absents : sable, glace, surfaces des routes réelles, chaleur transmise au pneu par la surface.
 
 ### R-3.2 Relief des routes et des circuits — L/XL ⬜
 - Voir R-4.1 pour les données ; côté physique : collider en maillage de hauteur plutôt que sol plat, raycasts de suspension inchangés, normales du terrain utilisées par les pneus (déjà gérées : la force suit la normale du contact).
 - **Points délicats** : continuité aux frontières de chunks, coût des colliders trimesh/heightfield, pente maximale tolérée par le franchissement d’obstacles, ponts et tunnels (exclus aujourd’hui par `roadGraph.ts`).
 - **Fin** : montée et descente continues, compression en bas de côte visible en télémétrie, pas de décollage parasite aux raccords.
 
-### R-3.3 Contrôle de traction et différentiel — M ⬜
-- Différentiel autobloquant (couple réparti selon l’écart de vitesse des roues motrices) et contrôle de traction réglable (limite de κ sur les roues motrices). Option dans le menu : **aides** (aucune / moyennes / complètes), qui agissent aussi sur l’ABS et la stabilité.
-- **Pourquoi** : une propulsion de 300 kW patine énormément au départ avec un différentiel ouvert.
-- **Fin** : le départ lancé d’une berline sport est 20 % plus rapide avec aides complètes ; tests de non-régression sur les 12 contrôles.
+### R-3.3 Contrôle de traction et différentiel 🟡
+- **Différentiel** : verrouillage par profil (`differentialLock`, 0 = ouvert) ; le couple de l'essieu est reporté vers la roue la plus lente. Routes : ouvert ; berline sport 0,35 ; monoplaces 0,2. Les vitesses de roue sont lues au début du pas : une première version, qui lisait des valeurs déjà modifiées par la boucle, rendait la monoplace instable (trouvé par un test existant).
+- **Contrôle de traction** : coupe le couple moteur quand une roue motrice dépasse un multiple du glissement au pic (« complète » ×1,2, « moyenne » ×2), chute rapide et remontée lente. Réglable dans le menu pause (« Aides à la conduite »), **moyenne par défaut**, mémorisé ; jamais imposé aux adversaires.
+- Mesuré (berline sport 330 kW, 0-100 km/h) : sans aide **5,52 s** et patinage de pointe 133 % ; moyenne 5,40 s (56 %) ; complète 5,35 s (34 %). Le gain de temps n'est que d'environ 3 % : l'objectif « 20 % plus rapide » du plan initial ne correspond pas à ce solveur, où le départ n'est pas très limité par le patinage. L'intérêt est la stabilité et l'usure des pneus.
+- Départ sur adhérence partagée (une roue sur l'herbe) : 12,7 s en différentiel ouvert, 10,9 s avec un verrouillage de 0,8 (−15 %).
+- Absents : ABS et stabilité désactivables (l'ABS reste toujours actif), réglage fin du différentiel, aides « moyennes / complètes » sur l'ABS.
 
-### R-3.4 Aérodynamique — M ⬜
-- Déportance (portance négative selon v²) répartie avant/arrière, qui augmente la charge de roue donc le grip ; sillage derrière un autre véhicule (réduction de traînée). Paramètres par profil (`vehicleProfiles.ts`).
-- **Effet** : les voitures de course tiennent aujourd’hui par leur gomme seule (grip 1,8-2,0) ; avec déportance on peut ramener la gomme à des valeurs réalistes et obtenir la vraie dépendance à la vitesse.
+### R-3.4 Aérodynamique 🟡 (déportance sans sillage)
+- Déportance ½·ρ·Cz·A·v² appliquée aux deux essieux (part avant par profil), transmise par les ressorts : la charge des roues augmente, donc la force maximale du pneu. Monoplace thermique Cz·A = 2,8 m², électrique 3,0 m² ; les voitures de route n'en ont pas.
+- La gomme des monoplaces est ramenée de 1,8 / 2,0 à 1,35 / 1,4 : leur adhérence augmente maintenant avec la vitesse. Suspension : à 70 m/s elle ne s'écrase que de 2,5 cm de plus.
+- Le pilote automatique en tient compte (v² = μ·g / (κ − μ·k), freinage dépendant de la vitesse, 70 % de l'effet compté) : **le plafond de 180 km/h imposé à la monoplace thermique est levé** ; elle boucle Suzuka à 276 km/h sans s'écarter de plus de 3,7 m (environ 75 s de plus qu'un vrai F1 : modèle sans toute la finesse d'une monoplace, pilote prudent).
+- Vérifié : freinage depuis 80 m/s au moins 20 % plus court avec déportance, inchangé à 20 m/s (tests) ; tours complets valides.
+- **Absent : le sillage** derrière une autre voiture (réduction de traînée), qui demande de connaître les positions des adversaires depuis le solveur.
 
 ### R-3.5 Usure des pneus et carburant — M/L ⬜
 - Usure en fonction du travail de glissement déjà calculé (`slidingPowerW`), qui réduit le grip ; carburant qui allège la voiture pendant la course et fixe l’autonomie. Stratégie : arrêt aux stands (R-2.x futur).

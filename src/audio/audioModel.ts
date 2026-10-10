@@ -152,9 +152,11 @@ export function tireSquealParams(slip: number, speedMps: number): TireSquealPara
   return { gain: 0.42 * intensity, hz: 900 + 28 * clamp(speedMps, 0, 45) };
 }
 
-export function rollingNoiseParams(speedMps: number, grounded: number): { gain: number; hz: number } {
+export function rollingNoiseParams(speedMps: number, grounded: number, looseShare = 0): { gain: number; hz: number } {
   const contact = clamp(grounded / 4, 0, 1);
-  return { gain: 0.14 * smoothstep(0.5, 38, speedMps) ** 1.2 * contact, hz: 350 + 45 * clamp(speedMps, 0, 45) };
+  const loose = clamp(looseShare, 0, 1);
+  // Sur gravier ou herbe, le roulement est plus bruyant (projections, brins) et plus grave que sur l'asphalte.
+  return { gain: 0.14 * smoothstep(0.5, 38, speedMps) ** 1.2 * contact * (1 + 1.4 * loose), hz: (350 + 45 * clamp(speedMps, 0, 45)) * (1 - 0.3 * loose) };
 }
 
 export function windNoiseParams(speedMps: number): { gain: number; hz: number } {

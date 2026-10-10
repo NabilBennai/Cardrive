@@ -6,7 +6,9 @@ import type { VehicleConfig, VehicleInput, VehicleTelemetry } from '../../shared
 import { genericVehicle } from '../configs/genericVehicle';
 import { groundDistanceM, restSuspensionM } from '../configs/vehicleProfiles';
 import { useVehiclePhysics, type WheelPose } from '../physics/useVehiclePhysics';
+import type { TractionControl } from '../physics/VehicleSimulation';
 import { extrapolationSeconds } from '../physics/stepClock';
+import type { SurfaceProvider } from '../physics/surfaces';
 import { KenneyCarModel } from './KenneyCarModel';
 import {
   resetVehicleBody, vehicleColliderMassProperties, vehicleColliderOffsetY, vehicleSpawnHeightM,
@@ -38,6 +40,10 @@ interface GenericCarProps {
   drivesClock?: boolean;
   /** Pose de remise en piste (course) : si présente et non nulle, `R` replace la voiture là plutôt qu'au point de départ. */
   respawnPoseRef?: React.RefObject<VehicleSpawnPose | null>;
+  /** Surface sous chaque roue (circuits) ; absent : asphalte partout. */
+  surfaceAt?: SurfaceProvider;
+  /** Contrôle de traction (aide du joueur) ; absent : désactivé. */
+  tractionControl?: TractionControl;
 }
 
 // Gabarit repris de la configuration physique (proche d'une Citroën C3 II phase 2,
@@ -136,6 +142,7 @@ const initialWheelPoses = (config: VehicleConfig): WheelPose[] => config.wheelMo
   contactX: 0,
   contactY: 0,
   contactZ: 0,
+  surface: 'asphalt' as const,
 }));
 
 /** Roue à jante aluminium 5 branches : pneu, disque de frein, jante, branches et écrous. */
@@ -361,9 +368,9 @@ function SideDetails() {
   );
 }
 
-export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef, drivesClock, respawnPoseRef }: GenericCarProps) {
+export function GenericCar({ bodyRef, input, telemetryRef, respawnVersion, onTelemetry, spawnPose, onAfterPhysicsStep, modelUrl, config = genericVehicle, wheelPosesOutRef, drivesClock, respawnPoseRef, surfaceAt, tractionControl }: GenericCarProps) {
   const wheelPosesRef = useRef(initialWheelPoses(config));
-  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep, drivesClock });
+  const physics = useVehiclePhysics({ config, bodyRef, input, telemetryRef, wheelPosesRef, respawnVersion, onTelemetry, onAfterStep: onAfterPhysicsStep, drivesClock, surfaceAt, tractionControl });
   const previousRespawnVersion = useRef(respawnVersion);
   // Après useVehiclePhysics (qui installe le tableau de poses du solveur) : on publie ce même tableau.
   useLayoutEffect(() => { if (wheelPosesOutRef) wheelPosesOutRef.current = wheelPosesRef.current; }, [wheelPosesOutRef]);

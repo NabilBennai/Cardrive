@@ -27,6 +27,8 @@ import { PerfOverlay } from '../debug/PerfOverlay';
 import { AudioSettingsPanel } from '../audio/AudioSettingsPanel';
 import { loadAudioSettings, saveAudioSettings, type AudioSettings } from '../audio/audioSettings';
 import { getGameAudio } from '../audio/GameAudio';
+import { loadAssists, saveAssists, TRACTION_LABELS, type AssistSettings } from '../vehicle/assists';
+import type { TractionControl } from '../vehicle/physics/VehicleSimulation';
 
 /** Crochet de test : `?autopilot` fait conduire la voiture du joueur par le pilote automatique (circuits uniquement). */
 const autopilotRequested = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('autopilot');
@@ -94,6 +96,14 @@ export function App() {
     setAudioSettings((current) => {
       const next = { ...current, ...patch };
       saveAudioSettings(next);
+      return next;
+    });
+  }, []);
+  const [assists, setAssists] = useState<AssistSettings>(loadAssists);
+  const chooseTractionControl = useCallback((tractionControl: TractionControl) => {
+    setAssists((current) => {
+      const next = { ...current, tractionControl };
+      saveAssists(next);
       return next;
     });
   }, []);
@@ -292,6 +302,7 @@ export function App() {
               race={raceProps}
               field={fieldProps}
               autopilot={autopilotRequested}
+              tractionControl={assists.tractionControl}
             />
           </Suspense>
         </SceneErrorBoundary>
@@ -383,6 +394,17 @@ export function App() {
             <button className="btn" onClick={resumeGame}>Reprendre</button>
             <button className="btn-quiet" onClick={respawn}>Repositionner la voiture</button>
             <button className="btn-quiet" onClick={quitToMenu}>Quitter vers le menu</button>
+            <fieldset className="settings-group">
+              <legend>Aides à la conduite</legend>
+              <div className="setup-row">
+                <span>Contrôle de traction</span>
+                <div className="segmented" role="group" aria-label="Contrôle de traction">
+                  {(Object.keys(TRACTION_LABELS) as TractionControl[]).map((level) => (
+                    <button key={level} aria-pressed={assists.tractionControl === level} onClick={() => chooseTractionControl(level)}>{TRACTION_LABELS[level]}</button>
+                  ))}
+                </div>
+              </div>
+            </fieldset>
             <AudioSettingsPanel settings={audioSettings} onChange={updateAudioSettings} />
             <dl className="controls-list">
               <dt><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Accélérer, braquer, freiner</dd>

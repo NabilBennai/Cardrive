@@ -366,6 +366,34 @@ try {
     return `grincement max ${loudestSqueal.toFixed(2)} · sourdine ${muted.level.toFixed(0)} dBFS`;
   });
 
+  await scenario('Hors piste : gravier et herbe détectés, poussière', async () => {
+    await home(page);
+    await page.click('Circuits F1 2026');
+    await page.waitFor("document.querySelector('.circuit-card')", 'le catalogue de circuits');
+    if (!(await page.click('Singapour'))) throw new Error('Circuit de Singapour introuvable.');
+    await page.waitFor("document.querySelector('.lap-hud')", 'le chrono');
+    await page.waitFor("!document.querySelector('.scene-loading')", 'la fin du chargement de la scène', 90_000);
+    await setPerfOverlay(page, true);
+    const loosePercent = async () => Number.parseInt(await page.eval("document.querySelector('[data-perf=\"surface\"]')?.textContent ?? ''"), 10);
+    await sleep(800);
+    const onTrack = await loosePercent();
+    if (onTrack !== 0) throw new Error(`Sur la grille, aucune roue ne devrait être sur sol meuble (${onTrack} %).`);
+    // Plein gaz en braquant à droite : la voiture quitte la piste.
+    await page.key('keyDown', 'KeyW', 'w');
+    await page.key('keyDown', 'KeyD', 'd');
+    const startedAt = Date.now();
+    let off = 0;
+    while (Date.now() - startedAt < 20_000 && off < 100) { await sleep(250); off = await loosePercent(); }
+    await sleep(1_200);
+    writeFileSync(join(outputDir, 'hors-piste.png'), await page.screenshot());
+    await page.key('keyUp', 'KeyD', 'd');
+    await page.key('keyUp', 'KeyW', 'w');
+    if (off < 100) throw new Error(`La voiture n'a pas quitté la piste (sol meuble : ${off} %).`);
+    await setPerfOverlay(page, false);
+    assertNoProblems(page, 'hors-piste');
+    return `quitté la piste en ${((Date.now() - startedAt) / 1000).toFixed(1)} s, 100 % des roues sur sol meuble`;
+  });
+
   await scenario('Chronométrage : ligne de départ, tour lancé, repositionnement, record affiché', async () => {
     await home(page);
     // Un record enregistré (Singapour, prototype) doit apparaître sur la carte du circuit.
@@ -493,6 +521,13 @@ try {
     await sleep(800);
     await page.tap('Escape', 'Escape');
     await page.waitFor("document.querySelector('.pause-panel h2')?.textContent === 'Pause'", 'le panneau de pause');
+    // Aides à la conduite : le contrôle de traction se règle (moyen par défaut) et le choix est mémorisé.
+    const defaultLevel = await page.eval("document.querySelector('[aria-label=\"Contrôle de traction\"] [aria-pressed=\"true\"]')?.textContent ?? ''");
+    if (defaultLevel !== 'Moyenne') throw new Error(`Contrôle de traction par défaut : « ${defaultLevel} » au lieu de « Moyenne ».`);
+    if (!(await page.click('Complète'))) throw new Error('Choix « Complète » introuvable.');
+    const saved = await page.eval("localStorage.getItem('cardrive.assists') ?? ''");
+    await page.eval("localStorage.removeItem('cardrive.assists')");
+    if (!saved.includes('full')) throw new Error(`Réglage non mémorisé (« ${saved} »).`);
     if (!(await page.click('Reprendre'))) throw new Error('Bouton « Reprendre » introuvable.');
     await page.waitFor("!document.querySelector('.pause-panel')", 'la fermeture de la pause');
     assertNoProblems(page, 'pause');
